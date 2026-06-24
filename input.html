@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KT 그레이드 대시보드</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <main class="app-shell input-page">
+      <header class="topbar">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">KT Grade Report</p>
+            <h1>KT 그레이드 대시보드</h1>
+          </div>
+          <nav class="page-nav" aria-label="페이지 이동">
+            <a href="index.html">요약 대시보드</a>
+            <a class="active" href="input.html">입력</a>
+            <a href="goal.html">목표달성</a>
+            <a href="partner.html">협력점 현황</a>
+          </nav>
+          <div class="status-panel" aria-live="polite">
+            <span class="status-dot" id="connectionDot"></span>
+            <span id="connectionText">로컬 모드</span>
+          </div>
+        </div>
+
+        <section class="settings-dock" aria-label="고정 설정">
+          <div class="dock-group target-group">
+            <span class="dock-title">목표 설정</span>
+            <div class="target-fields">
+              <label>
+                인터넷 목표
+                <input type="number" min="0" step="1" id="targetCount" value="1375" />
+              </label>
+              <label>
+                온라인 목표
+                <input type="number" min="0" step="1" id="onlineTargetCount" value="500" />
+              </label>
+              <label>
+                유심+기기 목표
+                <input type="number" min="0" step="1" id="muTargetCount" value="600" />
+              </label>
+              <label>
+                목표Point
+                <input type="number" min="0" step="1" id="targetPoint" value="3500" />
+              </label>
+              <label>
+                마감일
+                <input type="date" id="deadlineDate" />
+              </label>
+              <div class="business-day-box">
+                <span>남은 영업일수</span>
+                <strong id="remainingBusinessDaysView">0일</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="dock-group rate-group">
+            <span class="dock-title">개통율 설정</span>
+            <div class="rate-fields">
+              <label>
+                인터넷
+                <span class="percent-input">
+                  <input type="number" min="0" max="100" step="1" id="internetOpenRate" value="75" />
+                </span>
+              </label>
+              <label>
+                TV
+                <span class="percent-input">
+                  <input type="number" min="0" max="100" step="1" id="tvOpenRate" value="75" />
+                </span>
+              </label>
+              <label>
+                유심
+                <span class="percent-input">
+                  <input type="number" min="0" max="100" step="1" id="usimOpenRate" value="50" />
+                </span>
+              </label>
+              <label>
+                기기
+                <span class="percent-input">
+                  <input type="number" min="0" max="100" step="1" id="deviceOpenRate" value="50" />
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="dock-actions">
+            <button type="button" class="settings-save-btn" style="border-color:#2864ad; color:#2864ad;" id="openTiersModalBtn">구간/금액 설정</button>
+            <button type="button" class="settings-save-btn" id="saveSettingsBtn">설정 저장</button>
+          </div>
+        </section>
+      </header>
+
+      <section class="summary-grid" aria-label="주요 지표">
+        <article class="metric-card channel-card accent-green">
+          <div class="metric-card-head">
+            <span class="metric-label">온라인</span>
+            <small id="onlineInternetDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div>
+              <dt>개통완료</dt>
+              <dd id="completedOnlineInternetView">0</dd>
+            </div>
+            <div>
+              <dt>가설중</dt>
+              <dd id="installOnlineInternetView">0</dd>
+            </div>
+            <div class="expected-row">
+              <dt>개통예상</dt>
+              <dd id="expectedOnlineInternetView">0</dd>
+            </div>
+          </dl>
+        </article>
+        <article class="metric-card channel-card accent-blue">
+          <div class="metric-card-head">
+            <span class="metric-label">도매</span>
+            <small id="wholesaleInternetDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div>
+              <dt>개통완료</dt>
+              <dd id="completedWholesaleInternetView">0</dd>
+            </div>
+            <div>
+              <dt>가설중</dt>
+              <dd id="installWholesaleInternetView">0</dd>
+            </div>
+            <div class="expected-row">
+              <dt>개통예상</dt>
+              <dd id="expectedWholesaleInternetView">0</dd>
+            </div>
+          </dl>
+        </article>
+        <article class="metric-card total-card accent-rose">
+          <span class="metric-label">총 개통예상</span>
+          <strong id="expectedInternetView">0</strong>
+          <div id="expectedInternetBreakdown" style="font-size: 0.85em; color: var(--color-gray-600); margin-top: -5px; margin-bottom: 10px; font-weight: 600;">(온라인 0 + 도매 0)</div>
+          <small id="expectedInternetDelta">비교 대기</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <form class="input-panel" id="dashboardForm">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Input</p>
+              <h2 style="white-space: nowrap;">전체 개통 / 가설 입력</h2>
+            </div>
+            <input type="date" id="date" name="date" required />
+          </div>
+
+          <div class="entry-block">
+            <div class="entry-title">
+              <h3>개통 완료</h3>
+              <span>온라인 / 도매</span>
+            </div>
+            <div class="matrix-wrap">
+              <table class="input-matrix">
+                <thead>
+                  <tr>
+                    <th>경로</th>
+                    <th>인터넷</th>
+                    <th>메인TV</th>
+                    <th>추가단말</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>온라인</th>
+                    <td><input type="number" min="0" step="1" id="openOnlineInternet" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="openOnlineMainTv" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="openOnlineExtra" value="0" /></td>
+                  </tr>
+                  <tr>
+                    <th>도매</th>
+                    <td><input type="number" min="0" step="1" id="openWholesaleInternet" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="openWholesaleMainTv" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="openWholesaleExtra" value="0" /></td>
+                  </tr>
+                  <tr class="total-row">
+                    <th>총합</th>
+                    <td><input type="text" id="openTotalInternet" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                    <td><input type="text" id="openTotalMainTv" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                    <td><input type="text" id="openTotalExtra" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mobile-grid">
+              <label>
+                모바일 기기(M)
+                <input type="number" min="0" step="1" id="openMobileDevice" value="0" />
+              </label>
+              <label>
+                유심(U)
+                <input type="number" min="0" step="1" id="openMobileUsim" value="0" />
+              </label>
+              <label>
+                메인개통(동판/단판)
+                <input type="number" min="0" step="1" id="mainDongpanUsim" value="0" />
+              </label>
+            </div>
+          </div>
+
+          <div class="entry-block">
+            <div class="entry-title">
+              <h3>가설중</h3>
+              <span>접수 후 개통 대기</span>
+            </div>
+            <div class="matrix-wrap">
+              <table class="input-matrix">
+                <thead>
+                  <tr>
+                    <th>경로</th>
+                    <th>인터넷</th>
+                    <th>메인TV</th>
+                    <th>추가단말</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>온라인</th>
+                    <td><input type="number" min="0" step="1" id="installOnlineInternet" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="installOnlineMainTv" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="installOnlineExtra" value="0" /></td>
+                  </tr>
+                  <tr>
+                    <th>도매</th>
+                    <td><input type="number" min="0" step="1" id="installWholesaleInternet" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="installWholesaleMainTv" value="0" /></td>
+                    <td><input type="number" min="0" step="1" id="installWholesaleExtra" value="0" /></td>
+                  </tr>
+                  <tr class="total-row">
+                    <th>총합</th>
+                    <td><input type="text" id="installTotalInternet" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                    <td><input type="text" id="installTotalMainTv" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                    <td><input type="text" id="installTotalExtra" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mobile-grid">
+              <label>
+                모바일 기기(M)
+                <input type="number" min="0" step="1" id="installMobileDevice" value="0" />
+              </label>
+              <label>
+                유심(U)
+                <input type="number" min="0" step="1" id="installMobileUsim" value="0" />
+              </label>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" class="primary">저장</button>
+            <button type="button" id="resetBtn">초기화</button>
+          </div>
+        </form>
+
+        <aside class="insight-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Month</p>
+              <h2>월 누적 요약</h2>
+            </div>
+            <span class="date-chip" id="selectedDateView">-</span>
+          </div>
+
+          <div class="gauge-wrapper">
+            <svg class="gauge-svg" viewBox="0 0 120 120">
+              <defs>
+                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#3b82f6" />
+                  <stop offset="100%" stop-color="#10b981" />
+                </linearGradient>
+              </defs>
+              <circle class="gauge-bg" cx="60" cy="60" r="54" />
+              <circle class="gauge-fill" id="gaugeFillCircle" cx="60" cy="60" r="54" />
+            </svg>
+            <div class="gauge-value-box">
+              <span class="percent" id="gaugePercentText">0%</span>
+              <span class="label">인터넷 달성률</span>
+            </div>
+          </div>
+
+          <div class="progress-block">
+            <div class="progress-copy">
+              <span>모바일 목표 달성률 <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
+              <strong id="mobileProgressText">0%</strong>
+            </div>
+            <div class="progress-track">
+              <div id="mobileProgressBar"></div>
+            </div>
+          </div>
+
+          <dl class="detail-list">
+            <div>
+              <dt>완료 인터넷 온라인/도매</dt>
+              <dd id="completedInternetSplitView">0 / 0</dd>
+            </div>
+            <div>
+              <dt>총 인터넷 개통완료</dt>
+              <dd id="expectedInternetDetailView">0</dd>
+            </div>
+            <div>
+              <dt>인터넷 목표량</dt>
+              <dd id="internetTargetView">0</dd>
+            </div>
+            <div>
+              <dt>일 필요 인터넷 개통</dt>
+              <dd id="dailyNeedView">0</dd>
+            </div>
+            <div>
+              <dt>목표달성 현재</dt>
+              <dd id="tvCurrentPointView">0</dd>
+            </div>
+            <div>
+              <dt>달성목표</dt>
+              <dd id="tvTargetPointView">0</dd>
+            </div>
+            <div>
+              <dt>완료 기기/유심</dt>
+              <dd id="openMobileSplitView">0 / 0</dd>
+            </div>
+            <div>
+              <dt>총 모바일 개통완료</dt>
+              <dd id="expectedMobileDetailView">0</dd>
+            </div>
+            <div>
+              <dt>모바일 목표량</dt>
+              <dd id="mobileTargetView">0</dd>
+            </div>
+            <div>
+              <dt>일 필요 모바일 개통</dt>
+              <dd id="mobileDailyNeedView">0</dd>
+            </div>
+          </dl>
+        </aside>
+
+        <aside class="sidebar-panel">
+          <div class="excel-upload-zone" id="excelUploadZone">
+            <div class="icon">📊</div>
+            <p><strong>엑셀 파일(인터넷/TV/유심/기기)</strong>을 드래그 앤 드롭 하거나 클릭하여 업로드</p>
+            <div style="font-size: 12.5px; color: var(--color-gray-500); margin-top: 8px; line-height: 1.5;">
+              파일 이름에 아래 단어가 포함되어야 해당 항목으로 <strong>자동 분류</strong>됩니다.<br/>
+              <strong style="color: var(--color-gray-700);">개통완료:</strong> 인터넷_개통완료, TV_개통완료, 유심_개통완료, 기기_개통완료<br/>
+              <strong style="color: var(--color-gray-700);">가설중:</strong> 인터넷_가설중, TV_가설중, 유심_가설중, 기기_가설중
+            </div>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" multiple style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;" />
+          </div>
+
+          <section class="history-section">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">History</p>
+                <h2>최근 기록</h2>
+              </div>
+              <span id="message" role="status"></span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>날짜</th>
+                    <th>완료 온라인</th>
+                    <th>완료 도매</th>
+                    <th>가설 온라인</th>
+                    <th>가설 도매</th>
+                    <th>완료 TV</th>
+                    <th>가설 TV</th>
+                    <th>모바일</th>
+                    <th>예상 온라인</th>
+                    <th>예상 도매</th>
+                    <th>총 예상</th>
+                  </tr>
+                </thead>
+                <tbody id="historyBody">
+                  <tr>
+                    <td colspan="11">저장된 기록이 없습니다.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </aside>
+      </section>
+
+
+
+      <div class="modal-overlay" id="tiersModalOverlay">
+        <div class="modal-dialog">
+          <div class="modal-header">
+            <h2>구간 및 금액 설정</h2>
+            <button type="button" class="modal-close" id="closeTiersModalBtn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div>
+              <div class="modal-section-title">
+                <span>TV + M/U 합산 목표 구간</span>
+                <button type="button" id="addTvmuTierBtn">행 추가</button>
+              </div>
+              <div style="max-height:200px; overflow-y:auto; border:1px solid var(--line);">
+                <table class="modal-table">
+                  <thead>
+                    <tr>
+                      <th>Point</th>
+                      <th>지급금액 (만원)</th>
+                      <th style="width:50px;">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tvmuTiersBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div class="modal-section-title">
+                <span>도매 온라인 M/U 목표 구간</span>
+                <button type="button" id="addMuTierBtn">행 추가</button>
+              </div>
+              <div style="max-height:200px; overflow-y:auto; border:1px solid var(--line);">
+                <table class="modal-table">
+                  <thead>
+                    <tr>
+                      <th>건수</th>
+                      <th>지급금액 (만원)</th>
+                      <th style="width:50px;">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody id="muTiersBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="resetTiersBtn" style="margin-right:auto;">기본값 초기화</button>
+            <button type="button" id="cancelTiersBtn">취소</button>
+            <button type="button" class="primary" id="applyTiersBtn">확인 및 저장</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="config.js?v=1782308254802"></script>
+    <script src="utils.js?v=1782308254802"></script>
+    <script src="api.js?v=1782308254802"></script>
+    <script src="dom.js?v=1782308254802"></script>
+    <script src="excel.js?v=1782308254802"></script>
+    <script src="chart.js?v=1782308254802"></script>
+    <script src="goal.js?v=1782308254802"></script>
+    <script src="dashboard.js?v=1782308254802"></script>
+    <script src="app.js?v=1782308254802"></script>
+  </body>
+</html>

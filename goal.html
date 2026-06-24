@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KT 목표달성 그레이드 현황</title>
+  <meta name="description" content="KT 유선도매 온라인 매출UP 정책 및 M/U 목표달성 프로그램 구간별 달성 현황" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand-row">
+        <div>
+          <p class="eyebrow">KT Grade Report</p>
+          <h1>목표달성 현황</h1>
+        </div>
+        <nav class="page-nav" aria-label="페이지 이동">
+          <a href="index.html">요약 대시보드</a>
+          <a href="input.html">입력</a>
+          <a class="active" href="goal.html">목표달성</a>
+          <a href="partner.html">협력점 현황</a>
+        </nav>
+        <div class="status-panel" aria-live="polite">
+          <span class="status-dot" id="connectionDot"></span>
+          <span id="connectionText">로컬 모드</span>
+        </div>
+      </div>
+
+      <section class="settings-dock dashboard-filter" aria-label="조회 설정">
+        <div class="dock-group target-group">
+          <span class="dock-title">조회 설정</span>
+          <div class="filter-fields">
+            <label>
+              보고 월
+              <input type="month" id="reportMonth" />
+            </label>
+            <label>
+              조회 기준일
+              <input type="date" id="date" />
+            </label>
+            <div class="business-day-box">
+              <span>데이터 기준</span>
+              <strong id="dataStatusView">-</strong>
+            </div>
+          </div>
+        </div>
+        <div class="dock-actions">
+          <button type="button" class="primary" id="refreshGoalBtn" style="min-height:48px;padding:0 18px;">
+            새로고침
+          </button>
+        </div>
+      </section>
+    </header>
+
+    <!-- 현재 달성 요약 배너 -->
+    <section class="goal-banner-grid" aria-label="현재 달성 요약">
+      <article class="goal-banner-card goal-banner-tv">
+        <div class="goal-banner-icon">🏆</div>
+        <div class="goal-banner-body">
+          <p class="goal-banner-label">TV + M/U 합산 Point</p>
+          <p class="goal-banner-label2">개통완료 기준 (가설 제외)</p>
+          <strong class="goal-banner-value" id="tvmuPointView">0 P</strong>
+        </div>
+        <div class="goal-banner-tier">
+          <p class="goal-tier-label">현재 달성 구간</p>
+          <strong class="goal-tier-value" id="tvmuTierView">-</strong>
+          <p class="goal-tier-payment" id="tvmuPaymentView">-</p>
+        </div>
+      </article>
+      <article class="goal-banner-card goal-banner-mu">
+        <div class="goal-banner-icon">📱</div>
+        <div class="goal-banner-body">
+          <p class="goal-banner-label">M/U 개통완료 건수</p>
+          <p class="goal-banner-label2">개통완료 기준 (가설 제외)</p>
+          <strong class="goal-banner-value" id="muCountView">0 건</strong>
+        </div>
+        <div class="goal-banner-tier">
+          <p class="goal-tier-label">현재 달성 구간</p>
+          <strong class="goal-tier-value" id="muTierView">-</strong>
+          <p class="goal-tier-payment" id="muPaymentView">-</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ① TV + M/U 합산 Point 목표달성 -->
+    <div class="section-title">
+      <p class="eyebrow">Policy Grade ①</p>
+      <h2>유선도매 온라인 매출UP! 정책 <span class="section-subtitle">(point 목표달성)</span></h2>
+    </div>
+    <div class="goal-policy-meta">
+      <span class="policy-meta-chip" id="goalPointTargetLabel">목표 3,500P</span>
+      <span class="policy-meta-chip">온라인/도매</span>
+      <span class="policy-meta-chip chip-blue">TV 기본 2P · TV 추가 1P · M기기 2P · U유심 2P</span>
+    </div>
+
+    <section class="goal-table-wrap" aria-label="TV+MU합산 Point 구간표">
+      <table class="goal-grade-table" id="tvmuGradeTable">
+        <thead>
+          <tr>
+            <th class="col-rowhead">상품 구분</th>
+            <th colspan="2" class="col-group-header col-tv">TV</th>
+            <th colspan="2" class="col-group-header col-mu">M / U</th>
+            <th class="col-extra-header"></th>
+          </tr>
+          <tr class="subhead-row">
+            <th class="col-rowhead"></th>
+            <th class="col-tv">기본단말</th>
+            <th class="col-tv">추가단말</th>
+            <th class="col-mu">M</th>
+            <th class="col-mu">U</th>
+            <th></th>
+          </tr>
+          <tr class="point-row">
+            <th class="col-rowhead">Point</th>
+            <th class="col-tv">2P</th>
+            <th class="col-tv">1P</th>
+            <th class="col-mu">2P</th>
+            <th class="col-mu">2P</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tvmuGradeBody">
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ② M/U 목표달성 프로그램 -->
+    <div class="section-title" style="margin-top:36px;">
+      <p class="eyebrow">Policy Grade ②</p>
+      <h2>도매 온라인 M/U 목표달성 프로그램</h2>
+    </div>
+    <div class="goal-policy-meta">
+      <span class="policy-meta-chip" id="goalMuTargetLabel">M/U 목표 구간: 600건</span>
+      <span class="policy-meta-chip chip-green">도매/온라인 합산</span>
+    </div>
+
+    <section class="goal-table-wrap" aria-label="M/U 건수 구간표">
+      <table class="goal-grade-table goal-grade-table-mu" id="muGradeTable">
+        <thead>
+          <tr>
+            <th class="col-rowtype">구분</th>
+            <th>100건</th>
+            <th>200건</th>
+            <th>300건</th>
+            <th>450건</th>
+            <th>600건</th>
+            <th>750건</th>
+          </tr>
+        </thead>
+        <tbody id="muGradeBody">
+        </tbody>
+      </table>
+    </section>
+
+    <p class="goal-footer-note">※ 지급금액은 VAT 포함 기준입니다. 개통완료(가설 제외) 데이터 기준으로 자동 산출됩니다.</p>
+  </main>
+
+  <script src="config.js?v=1782308254802"></script>
+  <script src="utils.js?v=1782308254802"></script>
+  <script src="goal.js?v=1782308254802"></script>
+</body>
+
+</html>

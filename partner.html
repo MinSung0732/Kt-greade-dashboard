@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KT 그레이드 대시보드 - 협력점 현황</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">KT Grade Report</p>
+            <h1>협력점 개통 현황</h1>
+          </div>
+          <nav class="page-nav" aria-label="페이지 이동">
+            <a href="index.html">요약 대시보드</a>
+            <a href="input.html">입력</a>
+            <a href="goal.html">목표달성</a>
+            <a class="active" href="partner.html">협력점 현황</a>
+          </nav>
+          <div class="status-panel" aria-live="polite">
+            <span class="status-dot" id="connectionDot"></span>
+            <span id="connectionText">로컬 모드</span>
+          </div>
+        </div>
+
+        <section class="settings-dock dashboard-filter" aria-label="조회 설정">
+          <div class="dock-group target-group">
+            <span class="dock-title">조회 설정</span>
+            <div class="filter-fields">
+              <label>
+                보고 월
+                <input type="month" id="reportMonth" />
+              </label>
+              <label>
+                비교 대상 월
+                <input type="month" id="compareMonth" />
+              </label>
+              <label>
+                조회 기준일
+                <input type="date" id="date" />
+              </label>
+            </div>
+          </div>
+        </section>
+      </header>
+
+      <section class="dashboard-layout">
+        <!-- 요약 카드 패널 -->
+        <aside class="insight-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Summary</p>
+              <h2>협력점 요약</h2>
+            </div>
+          </div>
+
+          <dl class="detail-list">
+            <div>
+              <dt>활성 협력점 수</dt>
+              <dd id="activePartnersCount">0개점</dd>
+            </div>
+            <div>
+              <dt id="summaryThisPeriodLabel">이번 기간 개통</dt>
+              <dd id="totalThisPeriod">0건</dd>
+            </div>
+            <div>
+              <dt id="summaryDiffLabel">이전 기간 대비</dt>
+              <dd id="diffPeriodView">-</dd>
+            </div>
+          </dl>
+        </aside>
+
+        <!-- 테이블 분석 영역 -->
+        <div class="dashboard-content">
+          <div class="section-title">
+            <p class="eyebrow">Analysis</p>
+            <h2>업체별 개통 비교 및 증감</h2>
+          </div>
+
+          <!-- 명예의 전당 Top 3 리더보드 위젯 -->
+          <div class="leaderboard-row" id="partnerLeaderboard" style="display: none;"></div>
+
+          <div class="partner-filter-bar">
+            <div class="partner-filter-left">
+              <div class="partner-btn-group" id="categoryTab">
+                <span class="partner-btn-slider"></span>
+                <button type="button" class="active" data-value="internet">인터넷</button>
+                <button type="button" data-value="usim">유심</button>
+              </div>
+              <input
+                type="text"
+                id="partnerSearchInput"
+                class="partner-search-input"
+                placeholder="협력점 검색..."
+              />
+            </div>
+            
+            <div class="partner-filter-right">
+              <div class="partner-btn-group" id="periodTab">
+                <button type="button" data-value="daily">일간</button>
+                <button type="button" data-value="weekly">주간</button>
+                <button type="button" class="active" data-value="monthly">월간</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="partner-table-container">
+            <table class="partner-table" id="partnerTable">
+              <thead id="partnerTableHead">
+                <!-- 자바스크립트가 필터에 맞춰서 동적으로 채워넣을 부분 -->
+              </thead>
+              <tbody id="partnerTableBody">
+                <!-- 데이터 동적 삽입 -->
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--muted); padding: 40px 0;">
+                    데이터를 불러오는 중입니다...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 스크립트 파일 로드 -->
+    <script src="config.js?v=1782308254802"></script>
+    <script src="utils.js?v=1782308254802"></script>
+    <script src="api.js?v=1782308254802"></script>
+    <script src="partner.js?v=1782308254802"></script>
+  </body>
+</html>

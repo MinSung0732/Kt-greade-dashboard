@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KT 그레이드 대시보드</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">KT Grade Report</p>
+            <h1>KT 그레이드 대시보드</h1>
+          </div>
+          <nav class="page-nav" aria-label="페이지 이동">
+            <a class="active" href="index.html">요약 대시보드</a>
+            <a href="input.html">입력</a>
+            <a href="goal.html">목표달성</a>
+            <a href="partner.html">협력점 현황</a>
+          </nav>
+          <div class="status-panel" aria-live="polite">
+            <span class="status-dot" id="connectionDot"></span>
+            <span id="connectionText">로컬 모드</span>
+          </div>
+        </div>
+
+        <section class="settings-dock dashboard-filter" aria-label="조회 설정">
+          <div class="dock-group target-group">
+            <span class="dock-title">조회 설정</span>
+            <div class="filter-fields">
+              <label>
+                보고 월
+                <input type="month" id="reportMonth" />
+              </label>
+              <label>
+                조회 기준일
+                <input type="date" id="date" />
+              </label>
+              <div class="business-day-box">
+                <span>남은 영업일수</span>
+                <strong id="remainingBusinessDaysView">0일</strong>
+              </div>
+            </div>
+          </div>
+          <div class="dock-actions report-download-actions">
+            <button type="button" class="primary report-download-btn" id="downloadReportBtn">
+              엑셀 보고서 다운로드
+            </button>
+          </div>
+        </section>
+      </header>
+
+      <section class="dashboard-layout">
+        <aside class="insight-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Month</p>
+              <h2>월 누적 요약</h2>
+            </div>
+            <span class="date-chip" id="selectedDateView">-</span>
+          </div>
+
+          <div class="gauge-wrapper">
+            <svg class="gauge-svg" viewBox="0 0 120 120">
+              <defs>
+                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#3b82f6" />
+                  <stop offset="100%" stop-color="#10b981" />
+                </linearGradient>
+              </defs>
+              <circle class="gauge-bg" cx="60" cy="60" r="54" />
+              <circle class="gauge-fill" id="gaugeFillCircle" cx="60" cy="60" r="54" />
+            </svg>
+            <div class="gauge-value-box">
+              <span class="percent" id="gaugePercentText">0%</span>
+              <span class="label">인터넷 달성률</span>
+            </div>
+          </div>
+
+          <div class="progress-block">
+            <div class="progress-copy">
+              <span>모바일 목표 달성률 <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
+              <strong id="mobileProgressText">0%</strong>
+            </div>
+            <div class="progress-track">
+              <div id="mobileProgressBar"></div>
+            </div>
+          </div>
+
+          <dl class="detail-list">
+            <div>
+              <dt>완료 인터넷 온라인/도매</dt>
+              <dd id="completedInternetSplitView">0 / 0</dd>
+            </div>
+            <div>
+              <dt>총 인터넷 개통완료</dt>
+              <dd id="expectedInternetDetailView">0</dd>
+            </div>
+            <div>
+              <dt>인터넷 목표량</dt>
+              <dd id="internetTargetView">0</dd>
+            </div>
+            <div>
+              <dt>일 필요 인터넷 개통</dt>
+              <dd id="dailyNeedView">0</dd>
+            </div>
+            <div>
+              <dt>목표달성 현재</dt>
+              <dd id="tvCurrentPointView">0</dd>
+            </div>
+            <div>
+              <dt>달성목표</dt>
+              <dd id="tvTargetPointView">0</dd>
+            </div>
+            <div>
+              <dt>완료 기기/유심</dt>
+              <dd id="openMobileSplitView">0 / 0</dd>
+            </div>
+            <div>
+              <dt>총 모바일 개통완료</dt>
+              <dd id="expectedMobileDetailView">0</dd>
+            </div>
+            <div>
+              <dt>모바일 목표량</dt>
+              <dd id="mobileTargetView">0</dd>
+            </div>
+            <div>
+              <dt>일 필요 모바일 개통</dt>
+              <dd id="mobileDailyNeedView">0</dd>
+            </div>
+          </dl>
+        </aside>
+
+        <div class="dashboard-content">
+          <div class="section-title">
+            <p class="eyebrow">Internet</p>
+            <h2>인터넷 개통 요약</h2>
+          </div>
+          <section class="summary-grid" aria-label="주요 지표">
+        <article class="metric-card channel-card accent-green">
+          <div class="metric-card-head">
+            <span class="metric-label">온라인</span>
+            <small id="onlineInternetDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div>
+              <dt>개통완료</dt>
+              <dd id="completedOnlineInternetView">0</dd>
+            </div>
+            <div>
+              <dt>가설중</dt>
+              <dd id="installOnlineInternetView">0</dd>
+            </div>
+            <div class="expected-row">
+              <dt>개통예상</dt>
+              <dd id="expectedOnlineInternetView">0</dd>
+            </div>
+          </dl>
+        </article>
+        <article class="metric-card total-card accent-rose">
+          <span class="metric-label">총 개통예상</span>
+          <strong id="expectedInternetView">0</strong>
+          <div id="expectedInternetBreakdown" style="font-size: 0.85em; color: var(--color-gray-600); margin-top: -5px; margin-bottom: 10px; font-weight: 600;">(온라인 0 + 도매 0)</div>
+          <small id="expectedInternetDelta">비교 대기</small>
+        </article>
+        <article class="metric-card channel-card mirror-card accent-blue">
+          <div class="metric-card-head">
+            <span class="metric-label">도매</span>
+            <small id="wholesaleInternetDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div class="expected-row">
+              <dt>개통예상</dt>
+              <dd id="expectedWholesaleInternetView">0</dd>
+            </div>
+            <div>
+              <dt>가설중</dt>
+              <dd id="installWholesaleInternetView">0</dd>
+            </div>
+            <div>
+              <dt>개통완료</dt>
+              <dd id="completedWholesaleInternetView">0</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <div class="section-title">
+        <p class="eyebrow">TV</p>
+        <h2>TV 개통 요약</h2>
+      </div>
+      <section class="summary-grid" aria-label="TV 주요 지표">
+        <article class="metric-card channel-card tv-side-card accent-green">
+          <div class="metric-card-head">
+            <span class="metric-label">온라인</span>
+            <small id="onlineTvDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div>
+              <dt>개통완료 <span class="metric-hint">(메인+추단)</span></dt>
+              <dd id="completedOnlineTvView">0</dd>
+            </div>
+            <div>
+              <dt>가설중 <span class="metric-hint">(메인+추단)</span></dt>
+              <dd id="installOnlineTvView">0</dd>
+            </div>
+          </dl>
+        </article>
+        <article class="metric-card channel-card tv-total-card accent-rose">
+          <div class="metric-card-head">
+            <span class="metric-label">총 개통예상 (TV+M/U)</span>
+            <small id="expectedTvDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div>
+              <dt>메인TV <span class="metric-hint">(완료+예상)</span></dt>
+              <dd id="expectedMainTvView">0</dd>
+            </div>
+            <div class="expected-row">
+              <dt>추단 <span class="metric-hint">(완료+예상)</span></dt>
+              <dd id="expectedExtraTvView">0</dd>
+            </div>
+            <div>
+              <dt>Point <span class="metric-hint">(TV+M/U)</span></dt>
+              <dd id="tvPointView">0</dd>
+            </div>
+          </dl>
+        </article>
+        <article class="metric-card channel-card tv-side-card mirror-card accent-blue">
+          <div class="metric-card-head">
+            <span class="metric-label">도매</span>
+            <small id="wholesaleTvDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div>
+              <dt>가설중 <span class="metric-hint">(메인+추단)</span></dt>
+              <dd id="installWholesaleTvView">0</dd>
+            </div>
+            <div>
+              <dt>개통완료 <span class="metric-hint">(메인+추단)</span></dt>
+              <dd id="completedWholesaleTvView">0</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <div class="section-title">
+        <p class="eyebrow">Mobile</p>
+        <h2>유심 / 기기 개통 요약</h2>
+      </div>
+      <section class="half-summary-grid" aria-label="유심 및 기기 주요 지표">
+        <article class="metric-card channel-card accent-green">
+          <div class="metric-card-head">
+            <span class="metric-label">유심</span>
+            <small id="usimDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div>
+              <dt>개통완료</dt>
+              <dd id="completedUsimView">0</dd>
+            </div>
+            <div>
+              <dt>가설중</dt>
+              <dd id="installUsimView">0</dd>
+            </div>
+            <div class="expected-row">
+              <dt>개통예상</dt>
+              <dd id="expectedUsimView">0</dd>
+            </div>
+          </dl>
+        </article>
+        <article class="metric-card total-card accent-rose">
+          <span class="metric-label">총 모바일 개통예상</span>
+          <strong id="expectedMobileView">0</strong>
+          <small id="expectedMobileDelta">비교 대기</small>
+          <div style="margin-top: 14px; background: #f0f4f8; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; border: 1px solid #e1e7ef;">
+            메인회선 개통 <span id="mainDongpanUsimView" style="color: var(--blue); font-size: 14px; font-weight: 900; margin-left: 4px;">0</span>건
+          </div>
+        </article>
+        <article class="metric-card channel-card mirror-card accent-blue">
+          <div class="metric-card-head">
+            <span class="metric-label">기기</span>
+            <small id="deviceDelta">비교 대기</small>
+          </div>
+          <dl class="metric-breakdown">
+            <div class="expected-row">
+              <dt>개통예상</dt>
+              <dd id="expectedDeviceView">0</dd>
+            </div>
+            <div>
+              <dt>가설중</dt>
+              <dd id="installDeviceView">0</dd>
+            </div>
+            <div>
+              <dt>개통완료</dt>
+              <dd id="completedDeviceView">0</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <!-- 목표달성 현황 카드 -->
+      <div class="section-title">
+        <p class="eyebrow">Policy Grade</p>
+        <h2>목표달성 현황 <span style="font-size:13px;font-weight:700;color:var(--muted);">(개통완료 기준)</span></h2>
+      </div>
+      <section class="goal-summary-grid" aria-label="목표달성 현황">
+        <!-- ① TV+MU 합산 Point -->
+        <article class="goal-dash-card goal-dash-tv">
+          <div class="goal-dash-top">
+            <span class="goal-dash-icon">🏆</span>
+            <div>
+              <p class="goal-dash-label">TV + M/U 합산 Point</p>
+              <p class="goal-dash-sublabel">TV기본 2P · TV추가 1P · M기기 2P · U유심 2P</p>
+            </div>
+            <a href="goal.html" class="goal-dash-link">구간표 보기 →</a>
+          </div>
+          <div class="goal-dash-body">
+            <div class="goal-dash-score">
+              <span class="goal-dash-score-label">현재 Point <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(나의 목표: <span id="dashMyPointTargetView">0</span> P)</span></span>
+              <strong class="goal-dash-score-value" id="dashTvmuPointView">0 P</strong>
+            </div>
+            <div class="goal-dash-tier">
+              <div class="goal-dash-tier-item">
+                <span class="goal-dash-tier-label">달성 구간</span>
+                <strong class="goal-dash-tier-value" id="dashTvmuTierView">미달성</strong>
+              </div>
+              <div class="goal-dash-tier-item goal-dash-tier-payment">
+                <span class="goal-dash-tier-label">지급금액</span>
+                <strong class="goal-dash-tier-value" id="dashTvmuPaymentView">-</strong>
+              </div>
+              <div class="goal-dash-tier-item">
+                <span class="goal-dash-tier-label">다음 구간까지</span>
+                <strong class="goal-dash-tier-value goal-next" id="dashTvmuNextView">-</strong>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- ② M/U 건수 -->
+        <article class="goal-dash-card goal-dash-mu">
+          <div class="goal-dash-top">
+            <span class="goal-dash-icon">📱</span>
+            <div>
+              <p class="goal-dash-label">도매 온라인 M/U 목표달성</p>
+              <p class="goal-dash-sublabel">M(기기) + U(유심) 개통완료 건수</p>
+            </div>
+            <a href="goal.html" class="goal-dash-link">구간표 보기 →</a>
+          </div>
+          <div class="goal-dash-body">
+            <div class="goal-dash-score">
+              <span class="goal-dash-score-label">현재 건수 <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(나의 목표: <span id="dashMyMuTargetView">0</span> 건)</span></span>
+              <strong class="goal-dash-score-value" id="dashMuCountView">0 건</strong>
+            </div>
+            <div class="goal-dash-tier">
+              <div class="goal-dash-tier-item">
+                <span class="goal-dash-tier-label">달성 구간</span>
+                <strong class="goal-dash-tier-value" id="dashMuTierView">미달성</strong>
+              </div>
+              <div class="goal-dash-tier-item goal-dash-tier-payment">
+                <span class="goal-dash-tier-label">지급금액</span>
+                <strong class="goal-dash-tier-value" id="dashMuPaymentView">-</strong>
+              </div>
+              <div class="goal-dash-tier-item">
+                <span class="goal-dash-tier-label">다음 구간까지</span>
+                <strong class="goal-dash-tier-value goal-next" id="dashMuNextView">-</strong>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+
+        <div class="chart-filter-wrap">
+          <div class="chart-filter">
+            <label for="chartStartDate">조회 기간</label>
+            <input type="date" id="chartStartDate" class="chart-date-input" />
+            <span>~</span>
+            <input type="date" id="chartEndDate" class="chart-date-input" />
+          </div>
+        </div>
+        <section class="graph-grid" aria-label="그래프 영역">
+          <article class="graph-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Internet</p>
+                <h2>인터넷 (온라인/도매) 일별 현황</h2>
+              </div>
+            </div>
+            <div style="position: relative; height:200px; width:100%">
+              <canvas id="internetChart"></canvas>
+            </div>
+          </article>
+          <article class="graph-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Mobile</p>
+                <h2>일별 유심 및 기기 개통 현황</h2>
+              </div>
+            </div>
+            <div style="position: relative; height:200px; width:100%">
+              <canvas id="mobileChart"></canvas>
+            </div>
+          </article>
+          <article class="graph-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">TV</p>
+                <h2>TV 메인 및 추단 일별 현황</h2>
+              </div>
+            </div>
+            <div style="position: relative; height:200px; width:100%">
+              <canvas id="tvChart"></canvas>
+            </div>
+          </article>
+        </section>
+
+      <section class="history-section">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">History</p>
+            <h2>최근 기록</h2>
+          </div>
+          <span id="message" role="status"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>완료 온라인</th>
+                <th>완료 도매</th>
+                <th>가설 온라인</th>
+                <th>가설 도매</th>
+                <th>완료 TV</th>
+                <th>가설 TV</th>
+                <th>모바일</th>
+                <th>예상 온라인</th>
+                <th>예상 도매</th>
+                <th>총 예상</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr>
+                <td colspan="11">저장된 기록이 없습니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="report-export.js?v=1782308254802"></script>
+    <script src="config.js?v=1782308254802"></script>
+    <script src="utils.js?v=1782308254802"></script>
+    <script src="api.js?v=1782308254802"></script>
+    <script src="dom.js?v=1782308254802"></script>
+    <script src="excel.js?v=1782308254802"></script>
+    <script src="chart.js?v=1782308254802"></script>
+    <script src="goal.js?v=1782308254802"></script>
+    <script src="dashboard.js?v=1782308254802"></script>
+    <script src="app.js?v=1782308254802"></script>
+  </body>
+</html>
