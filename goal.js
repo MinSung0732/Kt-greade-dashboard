@@ -326,6 +326,7 @@
   const STORAGE_KEYS = {
     localRows: "kt-dashboard-local-rows",
     cachedRows: "kt-dashboard-cached-rows",
+    settings: "kt-dashboard-settings",
   };
 
   function getRows() {
@@ -421,6 +422,63 @@
   /* ──────────────────────────────────────────────
      9. 초기화 및 이벤트 바인딩
   ────────────────────────────────────────────── */
+  // 구글 시트로부터 최신 설정 및 데이터 동기화
+  function fetchSettingsAndRender() {
+    const apiUrl = String((window.KT_DASHBOARD_CONFIG || {}).apiUrl || "").trim();
+    if (!apiUrl) return;
+
+    const callbackName = `ktGoalSettingsCallback_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const url = new URL(apiUrl);
+    url.searchParams.set("action", "settings");
+    url.searchParams.set("callback", callbackName);
+
+    const script = document.createElement("script");
+    window[callbackName] = (data) => {
+      delete window[callbackName];
+      script.remove();
+      if (data && data.ok && data.settings) {
+        localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(data.settings));
+        render();
+      }
+    };
+    script.onerror = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+    script.src = url.toString();
+    document.body.appendChild(script);
+  }
+
+  function fetchRowsAndRender() {
+    const apiUrl = String((window.KT_DASHBOARD_CONFIG || {}).apiUrl || "").trim();
+    if (!apiUrl) return;
+
+    const callbackName = `ktGoalRowsCallback_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const url = new URL(apiUrl);
+    url.searchParams.set("action", "list");
+    url.searchParams.set("month", document.getElementById("reportMonth")?.value || "");
+    url.searchParams.set("callback", callbackName);
+
+    const script = document.createElement("script");
+    window[callbackName] = (data) => {
+      delete window[callbackName];
+      script.remove();
+      if (data && data.ok && data.rows) {
+        localStorage.setItem(STORAGE_KEYS.cachedRows, JSON.stringify(data.rows));
+        render();
+      }
+    };
+    script.onerror = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+    script.src = url.toString();
+    document.body.appendChild(script);
+  }
+
+  /* ──────────────────────────────────────────────
+     9. 초기화 및 이벤트 바인딩
+  ────────────────────────────────────────────── */
   document.addEventListener("DOMContentLoaded", () => {
     // 기본값 세팅
     const today = new Date();
@@ -442,11 +500,24 @@
     if (text) text.textContent = apiUrl ? "Google Sheets 연동" : "로컬 모드";
 
     // 이벤트
-    document.getElementById("refreshGoalBtn")?.addEventListener("click", render);
-    document.getElementById("reportMonth")?.addEventListener("change", render);
-    document.getElementById("date")?.addEventListener("change", render);
+    document.getElementById("refreshGoalBtn")?.addEventListener("click", () => {
+      fetchSettingsAndRender();
+      fetchRowsAndRender();
+    });
+    document.getElementById("reportMonth")?.addEventListener("change", () => {
+      render();
+      fetchRowsAndRender();
+    });
+    document.getElementById("date")?.addEventListener("change", () => {
+      render();
+      fetchRowsAndRender();
+    });
 
     render();
+
+    // 최초 동기화 수행
+    fetchSettingsAndRender();
+    fetchRowsAndRender();
   });
 
   /* localStorage 변경 감지 (다른 탭 입력 시 자동 갱신) */

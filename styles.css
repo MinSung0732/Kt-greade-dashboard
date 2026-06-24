@@ -1014,6 +1014,10 @@ label input {
   margin-top: 20px;
 }
 
+.history-section table {
+  min-width: auto;
+}
+
 .table-wrap {
   overflow-x: auto;
   margin-top: 16px;
