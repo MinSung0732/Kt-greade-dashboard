@@ -389,7 +389,7 @@ function renderHistory(rows) {
   const recentRows = rows.slice(-10).reverse();
 
   if (!recentRows.length) {
-    historyBody.innerHTML = '<tr><td colspan="5">저장된 기록이 없습니다.</td></tr>';
+    historyBody.innerHTML = '<tr><td colspan="11">저장된 기록이 없습니다.</td></tr>';
     return;
   }
 
@@ -398,10 +398,16 @@ function renderHistory(rows) {
       (row) => `
         <tr>
           <td>${escapeHtml(row.date)}</td>
-          <td>${formatNumber(row.open_internet)}</td>
-          <td>${formatNumber(row.expected_internet)}</td>
+          <td>${formatNumber(row.open_online_internet)}</td>
+          <td>${formatNumber(row.open_wholesale_internet)}</td>
+          <td>${formatNumber(row.install_online_internet)}</td>
+          <td>${formatNumber(row.install_wholesale_internet)}</td>
           <td>${formatNumber(row.open_tv)}</td>
+          <td>${formatNumber(row.install_tv)}</td>
           <td>${formatNumber(row.open_mobile_total)}</td>
+          <td>${formatNumber(row.expected_online_internet)}</td>
+          <td>${formatNumber(row.expected_wholesale_internet)}</td>
+          <td>${formatNumber(row.expected_internet)}</td>
         </tr>
       `,
     )

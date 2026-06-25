@@ -120,8 +120,8 @@ function processExcelFile(file) {
           if (statusIdx >= 0) {
             const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
             if (fileName.includes('가설중')) {
-              const excludedStatuses = ['개통완료', '보류', '취소완료', '해지(철회)중', '해지(철회)완료'];
-              if (excludedStatuses.some(status => statusVal.includes(status))) {
+              const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
+              if (!allowedStatuses.some(status => statusVal.includes(status))) {
                 isValidRow = false;
               }
             } else if (isCompletedFile) {
@@ -210,8 +210,8 @@ function processExcelFile(file) {
           if (statusIdx >= 0) {
             const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
             if (fileName.includes('가설중')) {
-              const excludedStatuses = ['개통완료', '보류', '취소완료', '해지(철회)중', '해지(철회)완료', '반품요청', '반품완료'];
-              if (excludedStatuses.some(status => statusVal.includes(status))) {
+              const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
+              if (!allowedStatuses.some(status => statusVal.includes(status))) {
                 isValidRow = false;
               }
             }
@@ -304,15 +304,8 @@ function processExcelFile(file) {
           if (statusIdx >= 0) statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
 
           if (fileName.includes('가설중')) {
-            const excludeStatuses = ['개통완료', '보류', '취소완료', '해지(철회)중', '해지(철회)완료', '반품요청', '반품완료'];
-            let isExcluded = false;
-            for (let st of excludeStatuses) {
-              if (statusVal.includes(st)) {
-                isExcluded = true;
-                break;
-              }
-            }
-            if (!isExcluded) {
+            const allowedStatuses = ['청약대기', '접수대기', '청약대기(무선)', '처리중', '접수중', '접수완료', '발송요청', '개통대기', '개통예정', '개통(MVNO)예정', '개통요청', '개통중'];
+            if (allowedStatuses.some(status => statusVal.includes(status))) {
               usimCount++;
             }
           } else {

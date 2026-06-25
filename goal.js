@@ -373,7 +373,17 @@
     // M/U 건수 (개통완료 기준)
     const muCount = openMobileDevice + openMobileUsim;
 
-    return { tvmuPoint, muCount, lastDate: filtered.length ? filtered[filtered.length - 1].date : "-" };
+    // Extract target values from the last row if present
+    const targetPoint = lastRow && lastRow.target_point !== undefined && lastRow.target_point !== "" ? toNum(lastRow.target_point) : null;
+    const muTargetCount = lastRow && lastRow.mu_target_count !== undefined && lastRow.mu_target_count !== "" ? toNum(lastRow.mu_target_count) : null;
+
+    return { 
+      tvmuPoint, 
+      muCount, 
+      lastDate: filtered.length ? filtered[filtered.length - 1].date : "-",
+      targetPoint,
+      muTargetCount
+    };
   }
 
   /* ──────────────────────────────────────────────
@@ -382,7 +392,7 @@
   function render() {
     const selectedMonth = document.getElementById("reportMonth")?.value || "";
     const rows = getRows();
-    const { tvmuPoint, muCount, lastDate } = computeStats(rows, selectedMonth);
+    const { tvmuPoint, muCount, lastDate, targetPoint, muTargetCount } = computeStats(rows, selectedMonth);
 
     setText("dataStatusView", lastDate);
     
@@ -390,14 +400,30 @@
     try {
       settings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || "{}");
     } catch (e) {}
+
+    // Apply custom tiers if present in settings
+    if (typeof parseTiers === "function") {
+      let parsedTvmu = [];
+      let parsedMu = [];
+      try {
+        if (settings.tvmu_tiers) parsedTvmu = typeof settings.tvmu_tiers === 'string' ? parseTiers(settings.tvmu_tiers, false) : settings.tvmu_tiers;
+      } catch (e) {}
+      try {
+        if (settings.mu_tiers) parsedMu = typeof settings.mu_tiers === 'string' ? parseTiers(settings.mu_tiers, true) : settings.mu_tiers;
+      } catch (e) {}
+      setTiers(parsedTvmu, parsedMu);
+    }
     
+    const finalMuTargetCount = muTargetCount !== null ? muTargetCount : (settings.mu_target_count !== undefined ? Number(settings.mu_target_count) : 600);
+    const finalTargetPoint = targetPoint !== null ? targetPoint : (settings.target_point !== undefined ? Number(settings.target_point) : 3500);
+
     const goalMuLabel = document.getElementById("goalMuTargetLabel");
-    if (goalMuLabel && settings.mu_target_count !== undefined) {
-      goalMuLabel.textContent = `M/U 목표 구간: ${Number(settings.mu_target_count).toLocaleString("ko-KR")}건`;
+    if (goalMuLabel) {
+      goalMuLabel.textContent = `M/U 목표 구간: ${finalMuTargetCount.toLocaleString("ko-KR")}건`;
     }
     const goalPointLabel = document.getElementById("goalPointTargetLabel");
-    if (goalPointLabel && settings.target_point !== undefined) {
-      goalPointLabel.textContent = `목표 ${Number(settings.target_point).toLocaleString("ko-KR")}P`;
+    if (goalPointLabel) {
+      goalPointLabel.textContent = `목표 ${finalTargetPoint.toLocaleString("ko-KR")}P`;
     }
     
     renderBanner(tvmuPoint, muCount);

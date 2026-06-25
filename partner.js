@@ -18,6 +18,9 @@ let filterState = {
   compareMonth: ''      // 'YYYY-MM'
 };
 
+let currentFilteredList = [];
+let currentLabels = { currentLabel: '이번달', prevLabel: '지난달' };
+
 function initInputs() {
   const now = new Date();
   const dateInput = document.getElementById("date");
@@ -111,6 +114,10 @@ function bindEvents() {
       loadAndRenderData();
     });
   });
+
+  // 다운로드 버튼 이벤트
+  document.getElementById("downloadExcelBtn")?.addEventListener("click", downloadExcel);
+  document.getElementById("downloadImageBtn")?.addEventListener("click", downloadImage);
 }
 
 function loadAndRenderData() {
@@ -170,6 +177,10 @@ function loadAndRenderData() {
 
   // 6. 테이블 렌더링
   renderDynamicTable(filteredList, currentLabel, prevLabel);
+
+  // 7. 글로벌 캐시 저장 (다운로드용)
+  currentFilteredList = filteredList;
+  currentLabels = { currentLabel, prevLabel };
 }
 
 // 필터 상태(일간/주간/월간)에 맞는 날짜 범위 및 라벨 획득
@@ -423,3 +434,166 @@ function renderLeaderboard(filteredList) {
 
   container.innerHTML = html;
 }
+
+// 엑셀 다운로드 기능 구현
+async function downloadExcel() {
+  if (!window.ExcelJS) {
+    alert("ExcelJS 라이브러리를 로드하지 못했습니다.");
+    return;
+  }
+  
+  const btn = document.getElementById("downloadExcelBtn");
+  const originalText = btn.textContent;
+  btn.textContent = "다운로드 중...";
+  btn.disabled = true;
+
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("협력점 개통 현황");
+    const categoryKo = filterState.category === 'internet' ? '인터넷' : '유심';
+    
+    // Set columns
+    sheet.columns = [
+      { header: "협력점명", key: "name", width: 25 },
+      { header: `${currentLabels.currentLabel} (${categoryKo})`, key: "thisPeriodCount", width: 25 },
+      { header: `${currentLabels.prevLabel} (${categoryKo})`, key: "prevPeriodCount", width: 25 },
+      { header: "차이", key: "diffCount", width: 15 },
+      { header: "최근 개통일", key: "latestDate", width: 20 },
+      { header: `최근 개통수 (${categoryKo})`, key: "latestCount", width: 25 }
+    ];
+    
+    // Apply table header styles
+    const headerRow = sheet.getRow(1);
+    headerRow.height = 30;
+    headerRow.eachCell(cell => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF1D5D48" } // Theme green
+      };
+      cell.font = {
+        name: "맑은 고딕",
+        size: 11,
+        bold: true,
+        color: { argb: "FFFFFFFF" }
+      };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "center"
+      };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFCCCCCC" } },
+        bottom: { style: "medium", color: { argb: "FF1D5D48" } },
+        left: { style: "thin", color: { argb: "FFCCCCCC" } },
+        right: { style: "thin", color: { argb: "FFCCCCCC" } }
+      };
+    });
+
+    // Add data rows
+    currentFilteredList.forEach(p => {
+      const row = sheet.addRow({
+        name: p.name,
+        thisPeriodCount: p.thisPeriodCount,
+        prevPeriodCount: p.prevPeriodCount,
+        diffCount: p.diffCount,
+        latestDate: p.latestDate,
+        latestCount: p.latestCount
+      });
+      
+      // Formatting and alignment
+      row.getCell("name").alignment = { vertical: "middle", horizontal: "left" };
+      row.getCell("thisPeriodCount").alignment = { vertical: "middle", horizontal: "right" };
+      row.getCell("thisPeriodCount").numFmt = "#,##0";
+      row.getCell("prevPeriodCount").alignment = { vertical: "middle", horizontal: "right" };
+      row.getCell("prevPeriodCount").numFmt = "#,##0";
+      row.getCell("diffCount").alignment = { vertical: "middle", horizontal: "right" };
+      row.getCell("diffCount").numFmt = "+#,##0;-#,##0;0";
+      row.getCell("latestDate").alignment = { vertical: "middle", horizontal: "center" };
+      row.getCell("latestCount").alignment = { vertical: "middle", horizontal: "right" };
+      row.getCell("latestCount").numFmt = "#,##0\"건\"";
+
+      // Style borders for data rows
+      row.eachCell(cell => {
+        cell.font = { name: "맑은 고딕", size: 10 };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE2E8F0" } },
+          bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+          left: { style: "thin", color: { argb: "FFE2E8F0" } },
+          right: { style: "thin", color: { argb: "FFE2E8F0" } }
+        };
+      });
+      
+      // Add colored text for diff
+      const diffCell = row.getCell("diffCount");
+      if (p.diffCount > 0) {
+        diffCell.font = { name: "맑은 고딕", size: 10, color: { argb: "FF10B981" }, bold: true };
+      } else if (p.diffCount < 0) {
+        diffCell.font = { name: "맑은 고딕", size: 10, color: { argb: "FFEF4444" }, bold: true };
+      }
+    });
+
+    // Export to browser
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const catText = filterState.category === 'internet' ? '인터넷' : '유심';
+    const periodText = filterState.period === 'daily' ? '일간' : (filterState.period === 'weekly' ? '주간' : '월간');
+    a.download = `협력점현황_${catText}_${periodText}_${filterState.reportMonth || filterState.date}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("엑셀 파일 저장 실패", error);
+    alert("엑셀 파일 다운로드 중 오류가 발생했습니다.");
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+// 이미지 다운로드 기능 구현
+function downloadImage() {
+  if (!window.html2canvas) {
+    alert("html2canvas 라이브러리를 로드하지 못했습니다.");
+    return;
+  }
+
+  const btn = document.getElementById("downloadImageBtn");
+  const originalText = btn.textContent;
+  btn.textContent = "이미지 변환 중...";
+  btn.disabled = true;
+
+  // Capture the dashboard layout container
+  const target = document.querySelector(".dashboard-layout") || document.body;
+  
+  html2canvas(target, {
+    useCORS: true,
+    allowTaint: true,
+    scale: 2, // Retain high quality
+    backgroundColor: "#f1f5f9", // Maintain body background color
+    onclone: (clonedDoc) => {
+      // Hide section title and filter bar from the captured image
+      const title = clonedDoc.querySelector(".dashboard-content .section-title");
+      if (title) title.style.display = "none";
+      const filterBar = clonedDoc.querySelector(".partner-filter-bar");
+      if (filterBar) filterBar.style.display = "none";
+    }
+  }).then(canvas => {
+    const link = document.createElement("a");
+    const catText = filterState.category === 'internet' ? '인터넷' : '유심';
+    const periodText = filterState.period === 'daily' ? '일간' : (filterState.period === 'weekly' ? '주간' : '월간');
+    link.download = `협력점현황_${catText}_${periodText}_${filterState.reportMonth || filterState.date}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }).catch(err => {
+    console.error("이미지 변환 오류", err);
+    alert("이미지 저장 중 오류가 발생했습니다.");
+    btn.textContent = originalText;
+    btn.disabled = false;
+  });
+}
+

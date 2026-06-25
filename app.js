@@ -105,6 +105,22 @@ function bindEvents() {
     debouncedRenderDashboard();
   });
   document.querySelector("#reportMonth")?.addEventListener("change", async () => {
+    const reportMonth = document.querySelector("#reportMonth").value;
+    const dateInput = document.querySelector("#date");
+    if (dateInput && reportMonth) {
+      const currentDateMonth = dateInput.value.slice(0, 7);
+      if (currentDateMonth !== reportMonth) {
+        const today = new Date();
+        const todayStr = toDateInputValue(today);
+        if (getMonthKey(todayStr) === reportMonth) {
+          dateInput.value = todayStr;
+        } else {
+          const [year, month] = reportMonth.split("-").map(Number);
+          const lastDay = new Date(year, month, 0);
+          dateInput.value = toDateInputValue(lastDay);
+        }
+      }
+    }
     await loadRecentRows();
   });
   document.querySelector("#targetCount")?.addEventListener("input", debouncedRenderDashboard);

@@ -44,6 +44,14 @@
               </label>
             </div>
           </div>
+          <div class="dock-actions report-download-actions" style="display: flex; flex-direction: column; gap: 8px;">
+            <button type="button" class="primary report-download-btn" id="downloadExcelBtn">
+              엑셀 다운로드
+            </button>
+            <button type="button" class="secondary report-download-btn" id="downloadImageBtn" style="background: var(--surface); color: var(--ink); border: 1px solid var(--line);">
+              이미지 다운로드
+            </button>
+          </div>
         </section>
       </header>
 
@@ -127,6 +135,8 @@
     </main>
 
     <!-- 스크립트 파일 로드 -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="config.js?v=1782309894630"></script>
     <script src="utils.js?v=1782309894630"></script>
     <script src="api.js?v=1782309894630"></script>
