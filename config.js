@@ -1,5 +1,5 @@
 window.KT_DASHBOARD_CONFIG = Object.freeze({
   apiUrl:
-    "https://script.google.com/macros/s/AKfycbz5_yLdIHMbXRRDLwPx0P4_S8FsChTHnPx69MhqrYwoRYt1xNAQdqCtlGZ1o1n8v-7O/exec",
+    "https://script.google.com/macros/s/AKfycbxbIwi1G0nzjZhYvrRmWdpLsyLNJy1fqoxMgRyKrH0DK1TPOx-BmAUwTVvEcs-t5RUD/exec",
   requestTimeoutMs: 15000,
 });
