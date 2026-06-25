@@ -120,13 +120,29 @@ function bindEvents() {
   document.getElementById("downloadImageBtn")?.addEventListener("click", downloadImage);
 }
 
-function loadAndRenderData() {
-  // 1. 데이터 가져오기
+async function loadAndRenderData() {
+  // 1. 데이터 가져오기 (Google Sheets API 우선 조회, 실패 시 localStorage 백업)
   let rawList = [];
   try {
-    rawList = JSON.parse(localStorage.getItem(PARTNER_STORAGE_KEY) || '[]');
+    if (typeof fetchRows === "function" && window.KT_DASHBOARD_CONFIG?.apiUrl) {
+      const rows = await fetchRows();
+      rawList = rows.map(r => ({
+        date: r.date,
+        partners: r.partner_data ? (typeof r.partner_data === 'string' ? JSON.parse(r.partner_data) : r.partner_data) : {}
+      })).filter(item => item.partners && Object.keys(item.partners).length > 0);
+      
+      // 로컬 스토리지도 함께 동기화
+      if (rawList.length > 0) {
+        localStorage.setItem(PARTNER_STORAGE_KEY, JSON.stringify(rawList));
+      }
+    } else {
+      rawList = JSON.parse(localStorage.getItem(PARTNER_STORAGE_KEY) || '[]');
+    }
   } catch (e) {
-    console.error("데이터 로딩 실패", e);
+    console.error("데이터 로딩 실패 (API 조회 실패, 로컬 백업 로드)", e);
+    try {
+      rawList = JSON.parse(localStorage.getItem(PARTNER_STORAGE_KEY) || '[]');
+    } catch (err) {}
   }
 
   // 2. 분류 및 비교 기준 기간 계산

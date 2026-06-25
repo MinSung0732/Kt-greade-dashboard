@@ -15,10 +15,19 @@ function updateMatrixTotals() {
 
   setVal('dailyTotalInternet', getVal('dailyOnlineInternet') + getVal('dailyWholesaleInternet'));
 }
-
 function readForm() {
   const raw = Object.fromEntries(fieldIds.map((id) => [id, getInputValue(id)]));
   
+  // Find partner data for the current date in localStorage
+  let partnerData = {};
+  try {
+    const partnerRows = JSON.parse(localStorage.getItem('kt-dashboard-partner-rows') || '[]');
+    const match = partnerRows.find(r => r.date === raw.date);
+    if (match && match.partners) {
+      partnerData = match.partners;
+    }
+  } catch (e) {}
+
   const base = {
     date: raw.date,
     open_online_internet: toNumber(raw.openOnlineInternet),
@@ -55,11 +64,11 @@ function readForm() {
     mu_target_count: toNumber(raw.muTargetCount || currentSettings.mu_target_count),
     target_point: toNumber(raw.targetPoint || currentSettings.target_point),
     deadline_date: raw.deadlineDate || currentSettings.deadline_date,
+    partner_data: JSON.stringify(partnerData)
   };
 
   return computeRowMetrics(base);
 }
-
 function renderDashboard(row, previousRow = null) {
   setText("#selectedDateView", row.date || "-");
   setText("#remainingBusinessDaysView", formatBusinessDayStatus(row));
@@ -484,6 +493,28 @@ function normalizeRows(rows) {
 
       if (!hasOnlineTarget) {
         normalized.online_target_count = currentSettings.online_target_count;
+      }
+
+      // Sync partner_data to local storage if present
+      if (row.partner_data) {
+        try {
+          const fetchedPartnerObj = typeof row.partner_data === 'string' ? JSON.parse(row.partner_data) : row.partner_data;
+          if (fetchedPartnerObj && Object.keys(fetchedPartnerObj).length > 0) {
+            let partnerRows = [];
+            try {
+              partnerRows = JSON.parse(localStorage.getItem('kt-dashboard-partner-rows') || '[]');
+            } catch (e) {}
+            const existingIdx = partnerRows.findIndex(item => item.date === normalized.date);
+            if (existingIdx >= 0) {
+              partnerRows[existingIdx].partners = fetchedPartnerObj;
+            } else {
+              partnerRows.push({ date: normalized.date, partners: fetchedPartnerObj });
+            }
+            localStorage.setItem('kt-dashboard-partner-rows', JSON.stringify(partnerRows));
+          }
+        } catch (e) {
+          console.error("Failed to parse partner_data from row", e);
+        }
       }
 
       return computeRowMetrics(normalized);

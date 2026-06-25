@@ -78,6 +78,7 @@ const HEADERS = [
   'daily_wholesale_internet',
   'daily_mobile_device',
   'daily_mobile_usim',
+  'partner_data',
 ];
 
 function doGet(e) {

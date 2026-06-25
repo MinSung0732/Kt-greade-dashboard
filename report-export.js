@@ -1215,7 +1215,7 @@
       [
         "target_count", "online_target_count", "mu_target_count", "target_point",
         "internet_open_rate_setting", "tv_open_rate_setting",
-        "usim_open_rate_setting", "device_open_rate_setting"
+        "usim_open_rate_setting", "device_open_rate_setting", "partner_data"
       ].forEach(k => {
         if (summary[k] !== undefined) reportSummary[k] = summary[k];
       });
