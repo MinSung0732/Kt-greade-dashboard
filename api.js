@@ -58,7 +58,18 @@ async function saveRow(row) {
     return row;
   }
 
-  const data = await requestScript("upsert", { row: JSON.stringify(row) });
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain",
+    },
+    body: JSON.stringify({
+      action: "upsert",
+      row: row,
+    }),
+  });
+  if (!response.ok) throw new Error("네트워크 응답 오류가 발생했습니다.");
+  const data = await response.json();
   if (!data.ok) throw new Error(data.error || "Google Sheets 응답 오류");
   setCachedRows(upsertByDate(getCachedRows(), row));
   return data.row;
@@ -105,9 +116,24 @@ async function saveSettings() {
   };
 
   try {
-    const data = await requestScript("saveSettings", {
-      settings: JSON.stringify(settings),
+    const apiUrl = getApiUrl();
+    if (!apiUrl) {
+      applySettings(settings);
+      showMessage("설정이 로컬에 임시 저장되었습니다.");
+      return;
+    }
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain",
+      },
+      body: JSON.stringify({
+        action: "saveSettings",
+        settings: settings,
+      }),
     });
+    if (!response.ok) throw new Error("네트워크 응답 오류가 발생했습니다.");
+    const data = await response.json();
     if (!data.ok) throw new Error(data.error || "설정 저장 오류");
     applySettings(data.settings || settings);
     dashboardRows = normalizeRows(dashboardRows);

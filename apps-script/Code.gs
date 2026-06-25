@@ -117,9 +117,19 @@ function doPost(e) {
       return respond({ ok: false, error: 'POST body is required' });
     }
     const body = JSON.parse(e.postData.contents || '{}');
-    if (body.action !== 'upsert') return respond({ ok: false, error: 'Unknown action' });
-    const row = upsertRow(body.row || {});
-    return respond({ ok: true, row });
+    const action = body.action;
+
+    if (action === 'upsert') {
+      const row = upsertRow(body.row || {});
+      return respond({ ok: true, row });
+    }
+
+    if (action === 'saveSettings') {
+      const settings = saveSettings(body.settings || {});
+      return respond({ ok: true, settings });
+    }
+
+    return respond({ ok: false, error: 'Unknown action' });
   } catch (error) {
     return respond({ ok: false, error: error.message });
   }
