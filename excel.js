@@ -350,7 +350,7 @@ function parseInternet(rows, isCompleted, fileName) {
     if (isOnline) onlineCount++;
     else if (isWholesale) wholesaleCount++;
     
-    if (isCompleted && partnerIdx >= 0) {
+    if (isCompleted && partnerIdx >= 0 && (isOnline || isWholesale)) {
       const partnerName = String(rows[i][partnerIdx] || '').trim();
       if (partnerName && partnerName !== 'null' && partnerName !== 'undefined') {
         partnerCounts[partnerName] = (partnerCounts[partnerName] || 0) + 1;

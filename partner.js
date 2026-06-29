@@ -56,6 +56,57 @@ function getFormatDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+function addDays(dateText, days) {
+  const date = new Date(`${dateText}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return getFormatDate(date);
+}
+
+function isBusinessDate(dateText) {
+  const date = new Date(`${dateText}T00:00:00`);
+  const day = date.getDay();
+  const holidays = typeof KOREA_HOLIDAYS !== "undefined" ? KOREA_HOLIDAYS : null;
+  return day !== 0 && day !== 6 && !(holidays instanceof Set && holidays.has(dateText));
+}
+
+function getPreviousBusinessDate(dateText) {
+  let cursor = addDays(dateText, -1);
+  while (!isBusinessDate(cursor)) {
+    cursor = addDays(cursor, -1);
+  }
+  return cursor;
+}
+
+function normalizePartnerRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map(row => {
+      const partners = row.partners || (row.partner_data ? (typeof row.partner_data === "string" ? JSON.parse(row.partner_data) : row.partner_data) : {});
+      return {
+        date: String(row.date || "").slice(0, 10),
+        partners,
+        totals: {
+          internet: toNumber(row.open_internet) || toNumber(row.open_online_internet) + toNumber(row.open_wholesale_internet),
+          usim: toNumber(row.open_mobile_usim)
+        },
+        daily: {
+          internet: toNumber(row.daily_online_internet) + toNumber(row.daily_wholesale_internet),
+          usim: toNumber(row.daily_mobile_usim)
+        }
+      };
+    })
+    .filter(item => item.date && ((item.partners && Object.keys(item.partners).length > 0) || item.totals.internet > 0 || item.totals.usim > 0 || item.daily.internet > 0 || item.daily.usim > 0))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function getRequiredMonths(...dateTexts) {
+  return Array.from(new Set(
+    dateTexts
+      .filter(Boolean)
+      .map(dateText => String(dateText).slice(0, 7))
+      .filter(month => /^\d{4}-\d{2}$/.test(month))
+  ));
+}
+
 function initConnectionState() {
   const connectionDot = document.getElementById("connectionDot");
   const connectionText = document.getElementById("connectionText");
@@ -121,37 +172,43 @@ function bindEvents() {
 }
 
 async function loadAndRenderData() {
+  const periodRanges = getPeriodRanges();
   // 1. 데이터 가져오기 (Google Sheets API 우선 조회, 실패 시 localStorage 백업)
   let rawList = [];
   try {
-    if (typeof fetchRows === "function" && window.KT_DASHBOARD_CONFIG?.apiUrl) {
-      const rows = await fetchRows();
-      rawList = rows.map(r => ({
-        date: r.date,
-        partners: r.partner_data ? (typeof r.partner_data === 'string' ? JSON.parse(r.partner_data) : r.partner_data) : {}
-      })).filter(item => item.partners && Object.keys(item.partners).length > 0);
+    if (typeof requestScript === "function" && window.KT_DASHBOARD_CONFIG?.apiUrl) {
+      const months = getRequiredMonths(periodRanges.currentStart, periodRanges.currentEnd, periodRanges.prevStart, periodRanges.prevEnd);
+      const responses = await Promise.all(months.map(month => requestScript("list", { month })));
+      const rows = responses.flatMap(data => {
+        if (!data.ok) throw new Error(data.error || "Google Sheets 응답 오류");
+        return data.rows || [];
+      });
+      rawList = normalizePartnerRows(typeof normalizeRows === "function" ? normalizeRows(rows) : rows);
       
       // 로컬 스토리지도 함께 동기화
       if (rawList.length > 0) {
         localStorage.setItem(PARTNER_STORAGE_KEY, JSON.stringify(rawList));
       }
     } else {
-      rawList = JSON.parse(localStorage.getItem(PARTNER_STORAGE_KEY) || '[]');
+      rawList = normalizePartnerRows(JSON.parse(localStorage.getItem(PARTNER_STORAGE_KEY) || '[]'));
     }
   } catch (e) {
     console.error("데이터 로딩 실패 (API 조회 실패, 로컬 백업 로드)", e);
     try {
-      rawList = JSON.parse(localStorage.getItem(PARTNER_STORAGE_KEY) || '[]');
+      rawList = normalizePartnerRows(JSON.parse(localStorage.getItem(PARTNER_STORAGE_KEY) || '[]'));
     } catch (err) {}
   }
 
   // 2. 분류 및 비교 기준 기간 계산
-  const { currentStart, currentEnd, prevStart, prevEnd, currentLabel, prevLabel } = getPeriodRanges();
-
   // 3. 데이터 집계
-  const currentSummary = aggregateRangeData(rawList, currentStart, currentEnd);
-  const prevSummary = aggregateRangeData(rawList, prevStart, prevEnd);
-  const latestInfo = findLatestPartnerCategoryActivations(rawList, filterState.category);
+  const currentSummary = aggregateRangeData(rawList, periodRanges.currentStart, periodRanges.currentEnd);
+  const prevSummary = aggregateRangeData(rawList, periodRanges.prevStart, periodRanges.prevEnd);
+  const currentTotals = aggregateRangeTotals(rawList, periodRanges.currentStart, periodRanges.currentEnd);
+  const prevTotals = aggregateRangeTotals(rawList, periodRanges.prevStart, periodRanges.prevEnd);
+  const latestInfo = findLatestPartnerCategoryActivations(
+    rawList.filter(row => row.date <= periodRanges.currentEnd),
+    filterState.category
+  );
 
   // 4. 업체 목록 추출 및 가공
   const allPartners = new Set([
@@ -186,17 +243,17 @@ async function loadAndRenderData() {
   });
 
   // 5. 대시보드 요약 정보 카드 갱신
-  renderSummaryCards(filteredList, currentLabel, prevLabel);
+  renderSummaryCards(filteredList, periodRanges.currentLabel, periodRanges.prevLabel, currentTotals, prevTotals);
 
   // 5.5 명예의 전당 리더보드 갱신
   renderLeaderboard(filteredList);
 
   // 6. 테이블 렌더링
-  renderDynamicTable(filteredList, currentLabel, prevLabel);
+  renderDynamicTable(filteredList, periodRanges.currentLabel, periodRanges.prevLabel);
 
   // 7. 글로벌 캐시 저장 (다운로드용)
   currentFilteredList = filteredList;
-  currentLabels = { currentLabel, prevLabel };
+  currentLabels = { currentLabel: periodRanges.currentLabel, prevLabel: periodRanges.prevLabel };
 }
 
 // 필터 상태(일간/주간/월간)에 맞는 날짜 범위 및 라벨 획득
@@ -206,27 +263,23 @@ function getPeriodRanges() {
   let currentLabel = '', prevLabel = '';
 
   if (state.period === 'daily') {
-    const baseDate = new Date(state.date);
-    const prevDate = new Date(baseDate);
-    prevDate.setDate(baseDate.getDate() - 1);
+    const prevBusinessDate = getPreviousBusinessDate(state.date);
 
     currentStart = state.date;
     currentEnd = state.date;
-    prevStart = getFormatDate(prevDate);
+    prevStart = prevBusinessDate;
     prevEnd = prevStart;
 
     currentLabel = '오늘';
     prevLabel = '어제';
   } else if (state.period === 'weekly') {
-    const baseDate = new Date(state.date);
-    
-    // 이번주 최근 7일 (기준일 포함 이전 6일)
+    const baseDate = new Date(`${state.date}T00:00:00`);
+    const mondayOffset = (baseDate.getDay() + 6) % 7;
     const currentStartDate = new Date(baseDate);
-    currentStartDate.setDate(baseDate.getDate() - 6);
+    currentStartDate.setDate(baseDate.getDate() - mondayOffset);
     currentStart = getFormatDate(currentStartDate);
     currentEnd = state.date;
 
-    // 지난주 (그 전 7일)
     const prevEndDate = new Date(currentStartDate);
     prevEndDate.setDate(currentStartDate.getDate() - 1);
     const prevStartDate = new Date(prevEndDate);
@@ -240,7 +293,9 @@ function getPeriodRanges() {
   } else {
     // 월간
     currentStart = state.reportMonth + "-01";
-    currentEnd = state.reportMonth + "-31"; // 널널하게 31일로 지정
+    currentEnd = state.date && state.date.slice(0, 7) === state.reportMonth
+      ? state.date
+      : state.reportMonth + "-31";
 
     prevStart = state.compareMonth + "-01";
     prevEnd = state.compareMonth + "-31";
@@ -253,21 +308,92 @@ function getPeriodRanges() {
 }
 
 // 범위 내 협력점별 개통량 집계
-function aggregateRangeData(list, start, end) {
+function getSnapshotAtOrBefore(list, dateText) {
+  const targetMonth = String(dateText || "").slice(0, 7);
+  const rows = (Array.isArray(list) ? list : [])
+    .filter(row => row && row.date && row.date.slice(0, 7) === targetMonth && row.date <= dateText)
+    .slice()
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  return rows.length ? rows[rows.length - 1] : null;
+}
+
+function collectPartnerNames(...rows) {
+  const names = new Set();
+  rows.forEach(row => {
+    const partners = row?.partners || {};
+    Object.keys(partners).forEach(name => names.add(name));
+  });
+  return names;
+}
+
+function subtractPartnerSnapshots(endRow, beforeRow) {
   const summary = {};
-  list.forEach(row => {
-    if (row.date && row.date >= start && row.date <= end) {
-      const partners = row.partners || {};
-      for (let p in partners) {
-        if (!summary[p]) {
-          summary[p] = { internet: 0, usim: 0 };
-        }
-        summary[p].internet += (partners[p].internet || 0);
-        summary[p].usim += (partners[p].usim || 0);
-      }
+  collectPartnerNames(endRow, beforeRow).forEach(name => {
+    const end = endRow?.partners?.[name] || {};
+    const before = beforeRow?.partners?.[name] || {};
+    const internet = Math.max(0, (end.internet || 0) - (before.internet || 0));
+    const usim = Math.max(0, (end.usim || 0) - (before.usim || 0));
+    if (internet > 0 || usim > 0) {
+      summary[name] = { internet, usim };
     }
   });
   return summary;
+}
+
+function subtractSnapshotTotals(endRow, beforeRow) {
+  return {
+    internet: Math.max(0, (endRow?.totals?.internet || 0) - (beforeRow?.totals?.internet || 0)),
+    usim: Math.max(0, (endRow?.totals?.usim || 0) - (beforeRow?.totals?.usim || 0))
+  };
+}
+
+function getRowsInRange(list, start, end) {
+  return (Array.isArray(list) ? list : [])
+    .filter(row => row && row.date && row.date >= start && row.date <= end)
+    .slice()
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function sumDailyTotals(list, start, end) {
+  return getRowsInRange(list, start, end).reduce((sum, row) => ({
+    internet: sum.internet + (row.daily?.internet || 0),
+    usim: sum.usim + (row.daily?.usim || 0)
+  }), { internet: 0, usim: 0 });
+}
+
+function aggregateRangeData(list, start, end) {
+  const isMonthlyRange = filterState.period === "monthly";
+  const rowsInRange = getRowsInRange(list, start, end);
+  if (!isMonthlyRange && rowsInRange.length > 0) {
+    return rowsInRange.reduce((summary, row) => {
+      const previousRow = getSnapshotAtOrBefore(list, addDays(row.date, -1));
+      const dailySummary = subtractPartnerSnapshots(row, previousRow);
+      Object.entries(dailySummary).forEach(([name, counts]) => {
+        if (!summary[name]) summary[name] = { internet: 0, usim: 0 };
+        summary[name].internet += counts.internet || 0;
+        summary[name].usim += counts.usim || 0;
+      });
+      return summary;
+    }, {});
+  }
+
+  const endSnapshot = getSnapshotAtOrBefore(list, end);
+  const beforeDate = addDays(start, -1);
+  const beforeSnapshot = beforeDate.slice(0, 7) === end.slice(0, 7) ? getSnapshotAtOrBefore(list, beforeDate) : null;
+  return subtractPartnerSnapshots(endSnapshot, beforeSnapshot);
+}
+
+function aggregateRangeTotals(list, start, end) {
+  const isMonthlyRange = filterState.period === "monthly";
+  const dailyTotals = sumDailyTotals(list, start, end);
+  if (!isMonthlyRange && (dailyTotals.internet > 0 || dailyTotals.usim > 0)) {
+    return dailyTotals;
+  }
+
+  const endSnapshot = getSnapshotAtOrBefore(list, end);
+  const beforeDate = addDays(start, -1);
+  const beforeSnapshot = beforeDate.slice(0, 7) === end.slice(0, 7) ? getSnapshotAtOrBefore(list, beforeDate) : null;
+  return subtractSnapshotTotals(endSnapshot, beforeSnapshot);
 }
 
 // 선택된 분류(인터넷/유심)별로 가장 최근 데이터가 존재했던 일자와 건수 탐색
@@ -277,11 +403,13 @@ function findLatestPartnerCategoryActivations(list, category) {
   // 날짜 오름차순 정렬
   const sortedList = [...list].sort((a, b) => a.date.localeCompare(b.date));
 
-  sortedList.forEach(row => {
+  sortedList.forEach((row, index) => {
     const date = row.date;
-    const partners = row.partners || {};
-    for (let p in partners) {
-      const count = partners[p][category] || 0;
+    const previousCandidate = index > 0 ? sortedList[index - 1] : null;
+    const previousRow = previousCandidate && previousCandidate.date.slice(0, 7) === date.slice(0, 7) ? previousCandidate : null;
+    const dailySummary = subtractPartnerSnapshots(row, previousRow);
+    for (let p in dailySummary) {
+      const count = dailySummary[p][category] || 0;
       if (count > 0) {
         latest[p] = { date, count };
       }
@@ -290,7 +418,7 @@ function findLatestPartnerCategoryActivations(list, category) {
   return latest;
 }
 
-function renderSummaryCards(filteredList, currentLabel, prevLabel) {
+function renderSummaryCards(filteredList, currentLabel, prevLabel, currentTotals = null, prevTotals = null) {
   const activeCount = filteredList.length; // 0건을 걸렀으므로 현재 탭 실적이 있는 활성점 수와 동일
   
   let totalThisPeriod = 0;
@@ -300,6 +428,14 @@ function renderSummaryCards(filteredList, currentLabel, prevLabel) {
     totalThisPeriod += p.thisPeriodCount;
     totalPrevPeriod += p.prevPeriodCount;
   });
+
+  const categoryKey = filterState.category;
+  if (currentTotals && currentTotals[categoryKey] > 0) {
+    totalThisPeriod = currentTotals[categoryKey];
+  }
+  if (prevTotals && prevTotals[categoryKey] > 0) {
+    totalPrevPeriod = prevTotals[categoryKey];
+  }
 
   const activeCountEl = document.getElementById("activePartnersCount");
   const totalThisPeriodEl = document.getElementById("totalThisPeriod");
@@ -612,4 +748,3 @@ function downloadImage() {
     btn.disabled = false;
   });
 }
-
