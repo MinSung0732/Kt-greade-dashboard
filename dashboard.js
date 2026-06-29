@@ -700,9 +700,4 @@ function applyRowToForm(row) {
   Object.entries(fieldMap).forEach(([id, value]) => {
     setInputValue(id, value);
   });
-
-  setSavedRateSettingValue("internetOpenRate", row.internet_open_rate_setting);
-  setSavedRateSettingValue("tvOpenRate", row.tv_open_rate_setting);
-  setSavedRateSettingValue("usimOpenRate", row.usim_open_rate_setting);
-  setSavedRateSettingValue("deviceOpenRate", row.device_open_rate_setting);
 }

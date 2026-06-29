@@ -31,6 +31,12 @@
     return number(value);
   }
 
+  function normalizedRate(rawValue, fallbackValue, defaultPercent) {
+    const fallback = number(fallbackValue);
+    const raw = number(rawValue) || fallback || number(defaultPercent);
+    return raw > 1 ? raw / 100 : raw;
+  }
+
   function monthKey(value) {
     return String(value || "").slice(0, 7);
   }
@@ -144,7 +150,7 @@
     }
   }
 
-  function computeMonthlySummary(rows, selectedDate, baseSummary) {
+  function computeMonthlySummary(rows, selectedDate, baseSummary, settings) {
     const selectedMonth = monthKey(selectedDate || baseSummary?.date);
     const monthRows = (Array.isArray(rows) ? rows : [])
       .filter(row =>
@@ -180,8 +186,7 @@
     sum.install_online_bundle_rate = sum.install_online_internet > 0 ? sum.install_online_main_tv / sum.install_online_internet : 0;
     sum.install_wholesale_bundle_rate = sum.install_wholesale_internet > 0 ? sum.install_wholesale_main_tv / sum.install_wholesale_internet : 0;
 
-    const storedRate = number(baseSummary?.internet_open_rate_setting);
-    const internetRate = storedRate > 1 ? storedRate / 100 : storedRate || 0.75;
+    const internetRate = normalizedRate(settings?.internet_open_rate, baseSummary?.internet_open_rate_setting, 75);
     sum.expected_internet = sum.open_internet + Math.floor(sum.install_internet * internetRate);
     sum.open_companion_rate = sum.expected_internet > 0 ? Math.floor((number(sum.main_dongpan_usim) / sum.expected_internet) * 100) / 100 : 0;
 
@@ -197,7 +202,7 @@
     return { ...filtered[filtered.length - 1] };
   }
 
-  function createDailyComparison(rows, summary, selectedDate) {
+  function createDailyComparison(rows, summary, selectedDate, settings) {
     const sourceRows = (Array.isArray(rows) ? rows : [])
       .filter((row) => row && row.date && (!selectedDate || row.date <= selectedDate))
       .slice()
@@ -206,8 +211,7 @@
     const rawPrevious = sourceRows[sourceRows.length - 2];
     const current = rawCurrent ? getAccumulatedRow(sourceRows, rawCurrent.date) : null;
     const previous = rawPrevious ? getAccumulatedRow(sourceRows, rawPrevious.date) : null;
-    const storedRate = number(current?.internet_open_rate_setting);
-    const internetRate = storedRate > 1 ? storedRate / 100 : storedRate || 0.75;
+    const internetRate = normalizedRate(settings?.internet_open_rate, summary?.internet_open_rate_setting || current?.internet_open_rate_setting, 75);
     const definitions = [
       ["온라인", "open_online_internet", "install_online_internet"],
       ["도매", "open_wholesale_internet", "install_wholesale_internet"],
@@ -709,10 +713,8 @@
     const uInstall = number(monthlySummary.install_mobile_usim);
     const muInstall = mInstall + uInstall;
 
-    const tvRaw = number(summary.tv_open_rate_setting) || number(settings?.tv_open_rate) || 75;
-    const tvRate = tvRaw > 1 ? tvRaw / 100 : tvRaw;
-    const muRaw = number(summary.usim_open_rate_setting) || number(settings?.usim_open_rate) || 50;
-    const muRate = muRaw > 1 ? muRaw / 100 : muRaw;
+    const tvRate = normalizedRate(settings?.tv_open_rate, summary.tv_open_rate_setting, 75);
+    const muRate = normalizedRate(settings?.usim_open_rate, summary.usim_open_rate_setting, 50);
 
     const mainTvExpected = Math.floor(mainTvInstall * tvRate);
     const extraTvExpected = Math.floor(extraTvInstall * tvRate);
@@ -937,10 +939,8 @@
     const mInstall = number(monthlySummary.install_mobile_device);
     const uInstall = number(monthlySummary.install_mobile_usim);
 
-    const uRaw = number(summary.usim_open_rate_setting) || number(settings?.usim_open_rate) || 50;
-    const uRate = uRaw > 1 ? uRaw / 100 : uRaw;
-    const mRaw = number(summary.device_open_rate_setting) || number(settings?.device_open_rate) || 50;
-    const mRate = mRaw > 1 ? mRaw / 100 : mRaw;
+    const uRate = normalizedRate(settings?.usim_open_rate, summary.usim_open_rate_setting, 50);
+    const mRate = normalizedRate(settings?.device_open_rate, summary.device_open_rate_setting, 50);
 
     const mExpected = Math.floor(mInstall * mRate);
     const uExpected = Math.floor(uInstall * uRate);
@@ -1203,7 +1203,7 @@
     workbook.creator = "KT Grade Report";
     workbook.created = new Date();
     workbook.modified = new Date();
-    const comparison = createDailyComparison(rows, summary || {}, selectedDate);
+    const comparison = createDailyComparison(rows, summary || {}, selectedDate, settings);
     comparison.dateRangeLabel = buildDateRangeLabel(selectedDate, reportMonth);
     const reportSummary = comparison.current ? { ...comparison.current } : { ...(summary || {}) };
     if (summary) {
@@ -1215,7 +1215,7 @@
         if (summary[k] !== undefined) reportSummary[k] = summary[k];
       });
     }
-    const monthlySummary = computeMonthlySummary(rows, selectedDate, reportSummary);
+    const monthlySummary = computeMonthlySummary(rows, selectedDate, reportSummary, settings);
     createReportSheet(workbook, reportSummary, selectedDate, reportMonth, comparison, monthlySummary);
     createTargetPointSheet(workbook, reportSummary, monthlySummary, settings);
     createMobileTargetSheet(workbook, reportSummary, monthlySummary, comparison, settings);
