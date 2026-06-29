@@ -75,383 +75,31 @@ function processExcelFile(file) {
       }
       
       const fileName = file.name || '';
-      let msg = '';
       
-      if (fileName.includes('인터넷')) {
-        let onlineCount = 0;
-        let wholesaleCount = 0;
-        
-        let headerRowIdx = 0;
-        let statusIdx = -1;
-        let branchIdx = -1;
-        let partnerIdx = -1;
-        
-        for (let r = 0; r < Math.min(10, rows.length); r++) {
-          const rowData = rows[r] || [];
-          const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
-          const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
-          const pIdx = rowData.findIndex(h => {
-            const clean = String(h).replace(/\s+/g, '');
-            return clean.includes('협력점') || clean.includes('협력점명');
-          });
-          
-          let validCols = 0;
-          if (sIdx >= 0) validCols++;
-          if (bIdx >= 0 && bIdx !== sIdx) validCols++;
-          
-          if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
-            headerRowIdx = r;
-            statusIdx = sIdx;
-            branchIdx = bIdx;
-            partnerIdx = pIdx;
-            break;
-          }
-        }
-        
-        const partnerCounts = {};
-        const isCompletedFile = fileName.includes('개통완료');
-        
-        for (let i = headerRowIdx + 1; i < rows.length; i++) {
-          if (!rows[i] || rows[i].length === 0) continue;
-          
-          let isValidRow = true;
-          let isOnline = false, isWholesale = false;
-          
-          if (statusIdx >= 0) {
-            const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
-            if (fileName.includes('가설중')) {
-              const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
-              if (!allowedStatuses.some(status => statusVal.includes(status))) {
-                isValidRow = false;
-              }
-            } else if (isCompletedFile) {
-              if (!statusVal.includes('개통완료')) {
-                isValidRow = false;
-              }
-            }
-          }
-          
-          if (!isValidRow) continue;
-          
-          if (branchIdx >= 0) {
-            const branchVal = String(rows[i][branchIdx] || '').replace(/\s+/g, '');
-            if (branchVal.includes('온라인')) isOnline = true;
-            else if (branchVal.includes('도매')) isWholesale = true;
-          } else {
-            for (let j = 0; j < rows[i].length; j++) {
-              const cellVal = String(rows[i][j] || '').replace(/\s+/g, '');
-              if (cellVal.includes('온라인')) isOnline = true;
-              else if (cellVal.includes('도매')) isWholesale = true;
-            }
-          }
-          
-          if (isOnline) onlineCount++;
-          else if (isWholesale) wholesaleCount++;
-          
-          if (isCompletedFile && partnerIdx >= 0) {
-            const partnerName = String(rows[i][partnerIdx] || '').trim();
-            if (partnerName && partnerName !== 'null' && partnerName !== 'undefined') {
-              partnerCounts[partnerName] = (partnerCounts[partnerName] || 0) + 1;
-            }
-          }
-        }
-        
-        if (isCompletedFile && partnerIdx >= 0) {
-          const currentDate = document.getElementById('date')?.value || new Date().toISOString().slice(0, 10);
-          savePartnerData(currentDate, 'internet', partnerCounts);
-        }
-        
-        let onlineId = '', wholesaleId = '';
-        if (fileName.includes('개통완료')) {
-          onlineId = 'openOnlineInternet'; wholesaleId = 'openWholesaleInternet';
-        } else if (fileName.includes('가설중')) {
-          onlineId = 'installOnlineInternet'; wholesaleId = 'installWholesaleInternet';
-        }
-        
-        if (onlineId) updateInput(onlineId, onlineCount);
-        if (wholesaleId) updateInput(wholesaleId, wholesaleCount);
-        msg = `[${fileName}] 온라인 ${onlineCount}건, 도매 ${wholesaleCount}건 반영됨`;
-        
-      } else if (fileName.includes('TV')) {
-        let onlineMainCount = 0, onlineExtraCount = 0;
-        let wholesaleMainCount = 0, wholesaleExtraCount = 0;
-        
-        let headerRowIdx = 0;
-        let statusIdx = -1;
-        let branchIdx = -1;
-        let optionIdx = -1;
-        
-        for (let r = 0; r < Math.min(10, rows.length); r++) {
-          const rowData = rows[r] || [];
-          const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
-          const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
-          const oIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상품옵션'));
-          
-          let validCols = 0;
-          if (sIdx >= 0) validCols++;
-          if (bIdx >= 0 && bIdx !== sIdx) validCols++;
-          if (oIdx >= 0 && oIdx !== sIdx && oIdx !== bIdx) validCols++;
-          
-          if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
-            headerRowIdx = r;
-            statusIdx = sIdx;
-            branchIdx = bIdx;
-            optionIdx = oIdx;
-            break;
-          }
-        }
-        
-        for (let i = headerRowIdx + 1; i < rows.length; i++) {
-          if (!rows[i] || rows[i].length === 0) continue;
-          
-          let isValidRow = true;
-          let isOnline = false, isWholesale = false, isExtra = false;
-          
-          if (statusIdx >= 0) {
-            const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
-            if (fileName.includes('가설중')) {
-              const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
-              if (!allowedStatuses.some(status => statusVal.includes(status))) {
-                isValidRow = false;
-              }
-            }
-          }
-          
-          if (!isValidRow) continue;
-          
-          if (branchIdx >= 0 && optionIdx >= 0) {
-            const branchVal = String(rows[i][branchIdx] || '').replace(/\s+/g, '');
-            const optionVal = String(rows[i][optionIdx] || '').replace(/\s+/g, '');
-            
-            if (branchVal.includes('(온라인)')) isOnline = true;
-            else if (branchVal.includes('(도매)')) isWholesale = true;
-            
-            if (optionVal.includes('(추단)') || optionVal.includes('(단독)')) isExtra = true;
-          } else {
-            for (let j = 0; j < rows[i].length; j++) {
-              const cellVal = String(rows[i][j] || '').replace(/\s+/g, '');
-              if (cellVal.includes('(온라인)')) isOnline = true;
-              else if (cellVal.includes('(도매)')) isWholesale = true;
-              if (cellVal.includes('(추단)') || cellVal.includes('(단독)')) isExtra = true;
-            }
-          }
-          
-          if (isOnline) {
-            if (isExtra) onlineExtraCount++; else onlineMainCount++;
-          } else if (isWholesale) {
-            if (isExtra) {
-              wholesaleExtraCount++;
-            } else {
-              wholesaleMainCount++;
-            }
-          }
-        }
-        
-        let targetPrefix = '';
-        if (fileName.includes('개통완료')) targetPrefix = 'open';
-        else if (fileName.includes('가설중')) targetPrefix = 'install';
-        
-        if (targetPrefix) {
-          updateInput(`${targetPrefix}OnlineMainTv`, onlineMainCount);
-          updateInput(`${targetPrefix}OnlineExtra`, onlineExtraCount);
-          updateInput(`${targetPrefix}WholesaleMainTv`, wholesaleMainCount);
-          updateInput(`${targetPrefix}WholesaleExtra`, wholesaleExtraCount);
-          msg = `[${fileName}] 온라인TV(메인 ${onlineMainCount}/추가 ${onlineExtraCount}), 도매TV(메인 ${wholesaleMainCount}/추가 ${wholesaleExtraCount}) 반영됨`;
-        }
-        
-      } else if (fileName.includes('유심')) {
-        let usimCount = 0;
-        let mainDongpanCount = 0;
-        
-        let headerRowIdx = 0;
-        let branchIdx = -1;
-        let optionIdx = -1;
-        let statusIdx = -1;
-        let partnerIdx = -1;
-        
-        for (let r = 0; r < Math.min(10, rows.length); r++) {
-          const rowData = rows[r] || [];
-          const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
-          const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
-          const oIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상품옵션'));
-          const pIdx = rowData.findIndex(h => {
-            const clean = String(h).replace(/\s+/g, '');
-            return clean.includes('협력점') || clean.includes('협력점명');
-          });
-          
-          let validCols = 0;
-          if (sIdx >= 0) validCols++;
-          if (bIdx >= 0 && bIdx !== sIdx) validCols++;
-          if (oIdx >= 0 && oIdx !== sIdx && oIdx !== bIdx) validCols++;
-          
-          if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
-            headerRowIdx = r;
-            branchIdx = bIdx;
-            optionIdx = oIdx;
-            statusIdx = sIdx;
-            partnerIdx = pIdx;
-            break;
-          }
-        }
-        
-        const partnerCounts = {};
-        const isCompletedFile = !fileName.includes('가설중');
-        
-        for (let i = headerRowIdx + 1; i < rows.length; i++) {
-          if (!rows[i] || rows[i].length === 0) continue;
-
-          let statusVal = '';
-          if (statusIdx >= 0) statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
-
-          if (fileName.includes('가설중')) {
-            const allowedStatuses = ['청약대기', '접수대기', '청약대기(무선)', '처리중', '접수중', '접수완료', '발송요청', '개통대기', '개통예정', '개통(MVNO)예정', '개통요청', '개통중'];
-            if (allowedStatuses.some(status => statusVal.includes(status))) {
-              usimCount++;
-            }
-          } else {
-            if (statusIdx >= 0 && !statusVal.includes('개통완료')) {
-              continue;
-            }
-
-            let hasUsimBranch = false;
-            let hasExcludeOption = false;
-            let hasFamilyDongpan = false;
-            
-            if (branchIdx >= 0 && optionIdx >= 0) {
-              const branchVal = String(rows[i][branchIdx] || '').trim();
-              const optionVal = String(rows[i][optionIdx] || '').trim();
-              
-              if (branchVal.includes('(유심)')) hasUsimBranch = true;
-              if (optionVal.includes('민원') || optionVal.includes('추가지급')) hasExcludeOption = true;
-              if (optionVal.includes('가족동판')) hasFamilyDongpan = true;
-            } else {
-              for (let j = 0; j < rows[i].length; j++) {
-                const cellVal = String(rows[i][j] || '').trim();
-                if (cellVal.includes('(유심)')) hasUsimBranch = true;
-                if (cellVal.includes('민원') || cellVal.includes('추가지급')) hasExcludeOption = true;
-                if (cellVal.includes('가족동판')) hasFamilyDongpan = true;
-              }
-            }
-            
-            if (hasUsimBranch && !hasExcludeOption) {
-              usimCount++;
-              if (!hasFamilyDongpan) {
-                mainDongpanCount++;
-              }
-              
-              if (partnerIdx >= 0) {
-                const partnerName = String(rows[i][partnerIdx] || '').trim();
-                if (partnerName && partnerName !== 'null' && partnerName !== 'undefined') {
-                  partnerCounts[partnerName] = (partnerCounts[partnerName] || 0) + 1;
-                }
-              }
-            }
-          }
-        }
-        
-        if (isCompletedFile && partnerIdx >= 0) {
-          const currentDate = document.getElementById('date')?.value || new Date().toISOString().slice(0, 10);
-          savePartnerData(currentDate, 'usim', partnerCounts);
-        }
-        
-        let targetId = '';
-        if (fileName.includes('가설중')) {
-          targetId = 'installMobileUsim';
-          updateInput(targetId, usimCount);
-          msg = `[${fileName}] 유심 가설중 ${usimCount}건 반영됨`;
-        } else {
-          updateInput('openMobileUsim', usimCount);
-          updateInput('mainDongpanUsim', mainDongpanCount);
-          msg = `[${fileName}] 유심 총 ${usimCount}건, 메인개통 ${mainDongpanCount}건 반영됨`;
-        }
-        
-      } else if (fileName.includes('기기')) {
-        let deviceCount = 0;
-        
-        let headerRowIdx = 0;
-        let branchIdx = -1;
-        let optionIdx = -1;
-        let statusIdx = -1;
-        
-        for (let r = 0; r < Math.min(10, rows.length); r++) {
-          const rowData = rows[r] || [];
-          const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
-          const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
-          const oIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상품옵션'));
-          
-          let validCols = 0;
-          if (sIdx >= 0) validCols++;
-          if (bIdx >= 0 && bIdx !== sIdx) validCols++;
-          if (oIdx >= 0 && oIdx !== sIdx && oIdx !== bIdx) validCols++;
-          
-          if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
-            headerRowIdx = r;
-            branchIdx = bIdx;
-            optionIdx = oIdx;
-            statusIdx = sIdx;
-            break;
-          }
-        }
-        
-        for (let i = headerRowIdx + 1; i < rows.length; i++) {
-          if (!rows[i] || rows[i].length === 0) continue;
-
-          let statusVal = '';
-          if (statusIdx >= 0) statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
-
-          let hasDeviceBranch = false;
-          let hasExcludeOption = false;
-          
-          if (branchIdx >= 0 && optionIdx >= 0) {
-            const branchVal = String(rows[i][branchIdx] || '').trim();
-            const optionVal = String(rows[i][optionIdx] || '').trim();
-            
-            if (branchVal.includes('3.무KT-우신(기기)(월☆통말)')) hasDeviceBranch = true;
-            if (optionVal.includes('민원') || optionVal.includes('추가지급')) hasExcludeOption = true;
-          } else {
-            for (let j = 0; j < rows[i].length; j++) {
-              const cellVal = String(rows[i][j] || '').trim();
-              if (cellVal.includes('3.무KT-우신(기기)(월☆통말)')) hasDeviceBranch = true;
-              if (cellVal.includes('민원') || cellVal.includes('추가지급')) hasExcludeOption = true;
-            }
-          }
-
-          // 상부점이 '3.무KT-우신(기기)(월☆통말)' 인 경우에만 카운트
-          if (!hasDeviceBranch) continue;
-
-          if (fileName.includes('가설중')) {
-            const excludeStatuses = ['개통완료', '보류', '취소완료', '해지(철회)중', '해지(철회)완료', '반품요청', '반품완료'];
-            let isExcluded = false;
-            for (let st of excludeStatuses) {
-              if (statusVal.includes(st)) {
-                isExcluded = true;
-                break;
-              }
-            }
-            if (!isExcluded) {
-              deviceCount++;
-            }
-          } else {
-            // 개통완료의 경우, 제외 옵션이 없어야 함
-            if (!hasExcludeOption) {
-              deviceCount++;
-            }
-          }
-        }
-        
-        let targetId = '';
-        if (fileName.includes('개통완료')) targetId = 'openMobileDevice';
-        else if (fileName.includes('가설중')) targetId = 'installMobileDevice';
-        
-        if (targetId) updateInput(targetId, deviceCount);
-        msg = `[${fileName}] 기기 ${deviceCount}건 반영됨`;
-
+      // 1. Try automatic detection by filename first
+      let category = '';
+      let isCompleted = true;
+      
+      if (fileName.includes('인터넷')) category = 'internet';
+      else if (fileName.includes('TV')) category = 'tv';
+      else if (fileName.includes('유심')) category = 'usim';
+      else if (fileName.includes('기기')) category = 'device';
+      
+      if (fileName.includes('가설중')) isCompleted = false;
+      
+      // 2. If filename doesn't classify, run auto-detection and show selection modal
+      if (category) {
+        const msg = executeParse(category, isCompleted, rows, fileName);
+        if (msg) showMessage(msg);
       } else {
-        showMessage('지원하지 않는 엑셀 파일 이름입니다. (인터넷/TV/유심/기기 중 하나가 포함되어야 합니다)');
-        return;
+        const predicted = autoDetectExcelType(fileName, rows);
+        showClassifyModal(fileName, predicted, (selectedType) => {
+          const [selCat, selStatus] = selectedType.split('_');
+          const selIsCompleted = (selStatus === 'completed');
+          const msg = executeParse(selCat, selIsCompleted, rows, fileName);
+          if (msg) showMessage(msg);
+        });
       }
-      
-      if (msg) showMessage(msg);
       
     } catch (error) {
       console.error(error);
@@ -462,6 +110,534 @@ function processExcelFile(file) {
     showMessage('파일을 읽는 중 오류가 발생했습니다.');
   };
   reader.readAsArrayBuffer(file);
+}
+
+function autoDetectExcelType(fileName, rows) {
+  // 1. Determine Status Type (Completed vs Pending)
+  let isCompleted = true; 
+  let hasPendingStatus = false;
+  let hasCompletedStatus = false;
+  
+  let statusColIdx = -1;
+  for (let r = 0; r < Math.min(10, rows.length); r++) {
+    const rowData = rows[r] || [];
+    statusColIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
+    if (statusColIdx >= 0) break;
+  }
+  
+  if (statusColIdx >= 0) {
+    let completedCount = 0;
+    let pendingCount = 0;
+    const pendingKeywords = ['처리중', '접수중', '실적확인중', '접수완료', '청약대기', '접수대기', '개통대기', '개통예정', '개통중'];
+    
+    for (let i = 1; i < Math.min(50, rows.length); i++) {
+      if (!rows[i] || rows[i].length <= statusColIdx) continue;
+      const statusVal = String(rows[i][statusColIdx] || '').replace(/\s+/g, '');
+      if (statusVal.includes('개통완료')) {
+        completedCount++;
+      } else if (pendingKeywords.some(kw => statusVal.includes(kw))) {
+        pendingCount++;
+      }
+    }
+    
+    if (pendingCount > completedCount) {
+      isCompleted = false;
+    }
+  } else {
+    if (fileName.includes('가설') || fileName.includes('접수') || fileName.includes('대기')) {
+      isCompleted = false;
+    }
+  }
+  
+  // 2. Determine Product Category (Internet, TV, Usim, Device)
+  let category = 'internet'; 
+  
+  let hasUsim = false;
+  let hasDevice = false;
+  let hasTv = false;
+  
+  for (let i = 0; i < Math.min(50, rows.length); i++) {
+    const row = rows[i] || [];
+    for (let j = 0; j < row.length; j++) {
+      const cellVal = String(row[j] || '');
+      if (cellVal.includes('(유심)')) {
+        hasUsim = true;
+      }
+      if (cellVal.includes('(기기)') || cellVal.includes('3.무KT-우신(기기)')) {
+        hasDevice = true;
+      }
+      if (cellVal.includes('(추단)') || cellVal.includes('(단독)') || cellVal.includes('올레tv') || cellVal.includes('지니TV')) {
+        hasTv = true;
+      }
+    }
+  }
+  
+  if (hasUsim) category = 'usim';
+  else if (hasDevice) category = 'device';
+  else if (hasTv) category = 'tv';
+  else {
+    if (fileName.includes('TV')) category = 'tv';
+    else if (fileName.includes('유심')) category = 'usim';
+    else if (fileName.includes('기기')) category = 'device';
+  }
+  
+  return { category, isCompleted };
+}
+
+function showClassifyModal(fileName, predicted, onSelect) {
+  let modal = document.getElementById('excelClassifyModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'excelClassifyModalOverlay';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:9999;';
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-dialog';
+    dialog.style.cssText = 'background:var(--surface); border-radius:12px; max-width:480px; width:90%; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.15); border:1px solid var(--line); color:var(--ink);';
+    
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;';
+    const title = document.createElement('h3');
+    title.innerText = '엑셀 파일 분류 선택';
+    title.style.margin = '0';
+    title.style.fontSize = '18px';
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.cssText = 'background:none; border:none; font-size:24px; cursor:pointer; color:var(--muted);';
+    closeBtn.onclick = () => modal.style.display = 'none';
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    
+    const body = document.createElement('div');
+    body.id = 'excelClassifyModalBody';
+    
+    dialog.appendChild(header);
+    dialog.appendChild(body);
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+  }
+  
+  const body = document.getElementById('excelClassifyModalBody');
+  body.innerHTML = `
+    <p style="margin:0 0 20px 0; font-size:14.5px; line-height:1.6; color: var(--ink);">
+      이름으로 자동 분류하지 못했습니다. 아래에서 맞는 분류를 선택해 주세요.<br/>
+      파일명: <span style="font-weight:700; color:var(--blue); word-break:break-all;">${fileName}</span>
+    </p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <button class="classify-btn" data-type="internet_completed" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">인터넷 - 개통완료</button>
+      <button class="classify-btn" data-type="internet_pending" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">인터넷 - 가설중</button>
+      <button class="classify-btn" data-type="tv_completed" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">TV - 개통완료</button>
+      <button class="classify-btn" data-type="tv_pending" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">TV - 가설중</button>
+      <button class="classify-btn" data-type="usim_completed" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">유심 - 개통완료</button>
+      <button class="classify-btn" data-type="usim_pending" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">유심 - 가설중</button>
+      <button class="classify-btn" data-type="device_completed" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">기기 - 개통완료</button>
+      <button class="classify-btn" data-type="device_pending" style="padding:12px; border-radius:8px; border:1px solid var(--line); font-weight:700; background:var(--surface); color:var(--ink); cursor:pointer; text-align:center; transition: all 0.2s;">기기 - 가설중</button>
+    </div>
+  `;
+  
+  const predKey = `${predicted.category}_${predicted.isCompleted ? 'completed' : 'pending'}`;
+  const buttons = body.querySelectorAll('.classify-btn');
+  buttons.forEach(btn => {
+    const type = btn.getAttribute('data-type');
+    if (type === predKey) {
+      btn.style.borderColor = 'var(--blue)';
+      btn.style.color = 'var(--blue)';
+      btn.style.background = '#eef6ff';
+      btn.innerText += ' (추천)';
+    }
+    
+    btn.onclick = () => {
+      onSelect(type);
+      modal.style.display = 'none';
+    };
+    
+    btn.onmouseenter = () => {
+      if (btn.getAttribute('data-type') !== predKey) {
+        btn.style.background = '#f5f7fa';
+      }
+    };
+    btn.onmouseleave = () => {
+      if (btn.getAttribute('data-type') !== predKey) {
+        btn.style.background = 'var(--surface)';
+      }
+    };
+  });
+  
+  modal.style.display = 'flex';
+}
+
+function executeParse(category, isCompleted, rows, fileName) {
+  if (category === 'internet') {
+    return parseInternet(rows, isCompleted, fileName);
+  } else if (category === 'tv') {
+    return parseTv(rows, isCompleted, fileName);
+  } else if (category === 'usim') {
+    return parseUsim(rows, isCompleted, fileName);
+  } else if (category === 'device') {
+    return parseDevice(rows, isCompleted, fileName);
+  }
+  return null;
+}
+
+function parseInternet(rows, isCompleted, fileName) {
+  let onlineCount = 0;
+  let wholesaleCount = 0;
+  
+  let headerRowIdx = 0;
+  let statusIdx = -1;
+  let branchIdx = -1;
+  let partnerIdx = -1;
+  
+  for (let r = 0; r < Math.min(10, rows.length); r++) {
+    const rowData = rows[r] || [];
+    const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
+    const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
+    const pIdx = rowData.findIndex(h => {
+      const clean = String(h).replace(/\s+/g, '');
+      return clean.includes('협력점') || clean.includes('협력점명');
+    });
+    
+    let validCols = 0;
+    if (sIdx >= 0) validCols++;
+    if (bIdx >= 0 && bIdx !== sIdx) validCols++;
+    
+    if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
+      headerRowIdx = r;
+      statusIdx = sIdx;
+      branchIdx = bIdx;
+      partnerIdx = pIdx;
+      break;
+    }
+  }
+  
+  const partnerCounts = {};
+  
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    if (!rows[i] || rows[i].length === 0) continue;
+    
+    let isValidRow = true;
+    let isOnline = false, isWholesale = false;
+    
+    if (statusIdx >= 0) {
+      const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
+      if (!isCompleted) {
+        const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
+        if (!allowedStatuses.some(status => statusVal.includes(status))) {
+          isValidRow = false;
+        }
+      } else {
+        if (!statusVal.includes('개통완료')) {
+          isValidRow = false;
+        }
+      }
+    }
+    
+    if (!isValidRow) continue;
+    
+    if (branchIdx >= 0) {
+      const branchVal = String(rows[i][branchIdx] || '').replace(/\s+/g, '');
+      if (branchVal.includes('온라인')) isOnline = true;
+      else if (branchVal.includes('도매')) isWholesale = true;
+    } else {
+      for (let j = 0; j < rows[i].length; j++) {
+        const cellVal = String(rows[i][j] || '').replace(/\s+/g, '');
+        if (cellVal.includes('온라인')) isOnline = true;
+        else if (cellVal.includes('도매')) isWholesale = true;
+      }
+    }
+    
+    if (isOnline) onlineCount++;
+    else if (isWholesale) wholesaleCount++;
+    
+    if (isCompleted && partnerIdx >= 0) {
+      const partnerName = String(rows[i][partnerIdx] || '').trim();
+      if (partnerName && partnerName !== 'null' && partnerName !== 'undefined') {
+        partnerCounts[partnerName] = (partnerCounts[partnerName] || 0) + 1;
+      }
+    }
+  }
+  
+  if (isCompleted && partnerIdx >= 0) {
+    const currentDate = document.getElementById('date')?.value || new Date().toISOString().slice(0, 10);
+    savePartnerData(currentDate, 'internet', partnerCounts);
+  }
+  
+  let onlineId = '', wholesaleId = '';
+  if (isCompleted) {
+    onlineId = 'openOnlineInternet'; wholesaleId = 'openWholesaleInternet';
+  } else {
+    onlineId = 'installOnlineInternet'; wholesaleId = 'installWholesaleInternet';
+  }
+  
+  if (onlineId) updateInput(onlineId, onlineCount);
+  if (wholesaleId) updateInput(wholesaleId, wholesaleCount);
+  return `[${fileName}] 온라인 인터넷 ${onlineCount}건, 도매 인터넷 ${wholesaleCount}건 반영됨`;
+}
+
+function parseTv(rows, isCompleted, fileName) {
+  let onlineMainCount = 0, onlineExtraCount = 0;
+  let wholesaleMainCount = 0, wholesaleExtraCount = 0;
+  
+  let headerRowIdx = 0;
+  let statusIdx = -1;
+  let branchIdx = -1;
+  let optionIdx = -1;
+  
+  for (let r = 0; r < Math.min(10, rows.length); r++) {
+    const rowData = rows[r] || [];
+    const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
+    const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
+    const oIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상품옵션'));
+    
+    let validCols = 0;
+    if (sIdx >= 0) validCols++;
+    if (bIdx >= 0 && bIdx !== sIdx) validCols++;
+    if (oIdx >= 0 && oIdx !== sIdx && oIdx !== bIdx) validCols++;
+    
+    if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
+      headerRowIdx = r;
+      statusIdx = sIdx;
+      branchIdx = bIdx;
+      optionIdx = oIdx;
+      break;
+    }
+  }
+  
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    if (!rows[i] || rows[i].length === 0) continue;
+    
+    let isValidRow = true;
+    let isOnline = false, isWholesale = false, isExtra = false;
+    
+    if (statusIdx >= 0) {
+      const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
+      if (!isCompleted) {
+        const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
+        if (!allowedStatuses.some(status => statusVal.includes(status))) {
+          isValidRow = false;
+        }
+      } else {
+        if (!statusVal.includes('개통완료')) {
+          isValidRow = false;
+        }
+      }
+    }
+    
+    if (!isValidRow) continue;
+    
+    if (branchIdx >= 0 && optionIdx >= 0) {
+      const branchVal = String(rows[i][branchIdx] || '').replace(/\s+/g, '');
+      const optionVal = String(rows[i][optionIdx] || '').replace(/\s+/g, '');
+      
+      if (branchVal.includes('(온라인)')) isOnline = true;
+      else if (branchVal.includes('(도매)')) isWholesale = true;
+      
+      if (optionVal.includes('(추단)') || optionVal.includes('(단독)')) isExtra = true;
+    } else {
+      for (let j = 0; j < rows[i].length; j++) {
+        const cellVal = String(rows[i][j] || '').replace(/\s+/g, '');
+        if (cellVal.includes('(온라인)')) isOnline = true;
+        else if (cellVal.includes('(도매)')) isWholesale = true;
+        if (cellVal.includes('(추단)') || cellVal.includes('(단독)')) isExtra = true;
+      }
+    }
+    
+    if (isOnline) {
+      if (isExtra) onlineExtraCount++; else onlineMainCount++;
+    } else if (isWholesale) {
+      if (isExtra) wholesaleExtraCount++; else wholesaleMainCount++;
+    }
+  }
+  
+  let targetPrefix = isCompleted ? 'open' : 'install';
+  updateInput(`${targetPrefix}OnlineMainTv`, onlineMainCount);
+  updateInput(`${targetPrefix}OnlineExtra`, onlineExtraCount);
+  updateInput(`${targetPrefix}WholesaleMainTv`, wholesaleMainCount);
+  updateInput(`${targetPrefix}WholesaleExtra`, wholesaleExtraCount);
+  
+  return `[${fileName}] 온라인TV(메인 ${onlineMainCount}/추가 ${onlineExtraCount}), 도매TV(메인 ${wholesaleMainCount}/추가 ${wholesaleExtraCount}) 반영됨`;
+}
+
+function parseUsim(rows, isCompleted, fileName) {
+  let usimCount = 0;
+  let mainDongpanCount = 0;
+  
+  let headerRowIdx = 0;
+  let branchIdx = -1;
+  let optionIdx = -1;
+  let statusIdx = -1;
+  let partnerIdx = -1;
+  
+  for (let r = 0; r < Math.min(10, rows.length); r++) {
+    const rowData = rows[r] || [];
+    const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
+    const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
+    const oIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상품옵션'));
+    const pIdx = rowData.findIndex(h => {
+      const clean = String(h).replace(/\s+/g, '');
+      return clean.includes('협력점') || clean.includes('협력점명');
+    });
+    
+    let validCols = 0;
+    if (sIdx >= 0) validCols++;
+    if (bIdx >= 0 && bIdx !== sIdx) validCols++;
+    if (oIdx >= 0 && oIdx !== sIdx && oIdx !== bIdx) validCols++;
+    
+    if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
+      headerRowIdx = r;
+      branchIdx = bIdx;
+      optionIdx = oIdx;
+      statusIdx = sIdx;
+      partnerIdx = pIdx;
+      break;
+    }
+  }
+  
+  const partnerCounts = {};
+  
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    if (!rows[i] || rows[i].length === 0) continue;
+
+    let statusVal = '';
+    if (statusIdx >= 0) statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
+
+    if (!isCompleted) {
+      const allowedStatuses = ['청약대기', '접수대기', '청약대기(무선)', '처리중', '접수중', '접수완료', '발송요청', '개통대기', '개통예정', '개통(MVNO)예정', '개통요청', '개통중'];
+      if (allowedStatuses.some(status => statusVal.includes(status))) {
+        usimCount++;
+      }
+    } else {
+      if (statusIdx >= 0 && !statusVal.includes('개통완료')) {
+        continue;
+      }
+
+      let hasUsimBranch = false;
+      let hasExcludeOption = false;
+      let hasFamilyDongpan = false;
+      
+      if (branchIdx >= 0 && optionIdx >= 0) {
+        const branchVal = String(rows[i][branchIdx] || '').trim();
+        const optionVal = String(rows[i][optionIdx] || '').trim();
+        
+        if (branchVal.includes('(유심)')) hasUsimBranch = true;
+        if (optionVal.includes('민원') || optionVal.includes('추가지급')) hasExcludeOption = true;
+        if (optionVal.includes('가족동판')) hasFamilyDongpan = true;
+      } else {
+        for (let j = 0; j < rows[i].length; j++) {
+          const cellVal = String(rows[i][j] || '').trim();
+          if (cellVal.includes('(유심)')) hasUsimBranch = true;
+          if (cellVal.includes('민원') || cellVal.includes('추가지급')) hasExcludeOption = true;
+          if (cellVal.includes('가족동판')) hasFamilyDongpan = true;
+        }
+      }
+      
+      if (hasUsimBranch && !hasExcludeOption) {
+        usimCount++;
+        if (!hasFamilyDongpan) {
+          mainDongpanCount++;
+        }
+        
+        if (partnerIdx >= 0) {
+          const partnerName = String(rows[i][partnerIdx] || '').trim();
+          if (partnerName && partnerName !== 'null' && partnerName !== 'undefined') {
+            partnerCounts[partnerName] = (partnerCounts[partnerName] || 0) + 1;
+          }
+        }
+      }
+    }
+  }
+  
+  if (isCompleted && partnerIdx >= 0) {
+    const currentDate = document.getElementById('date')?.value || new Date().toISOString().slice(0, 10);
+    savePartnerData(currentDate, 'usim', partnerCounts);
+  }
+  
+  if (!isCompleted) {
+    updateInput('installMobileUsim', usimCount);
+    return `[${fileName}] 유심 가설중 ${usimCount}건 반영됨`;
+  } else {
+    updateInput('openMobileUsim', usimCount);
+    updateInput('mainDongpanUsim', mainDongpanCount);
+    return `[${fileName}] 유심 총 ${usimCount}건, 메인개통 ${mainDongpanCount}건 반영됨`;
+  }
+}
+
+function parseDevice(rows, isCompleted, fileName) {
+  let deviceCount = 0;
+  
+  let headerRowIdx = 0;
+  let branchIdx = -1;
+  let optionIdx = -1;
+  let statusIdx = -1;
+  
+  for (let r = 0; r < Math.min(10, rows.length); r++) {
+    const rowData = rows[r] || [];
+    const sIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('개통상태'));
+    const bIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상부점'));
+    const oIdx = rowData.findIndex(h => String(h).replace(/\s+/g, '').includes('상품옵션'));
+    
+    let validCols = 0;
+    if (sIdx >= 0) validCols++;
+    if (bIdx >= 0 && bIdx !== sIdx) validCols++;
+    if (oIdx >= 0 && oIdx !== sIdx && oIdx !== bIdx) validCols++;
+    
+    if (validCols >= 2 || (bIdx >= 0 && rowData.length > 3)) {
+      headerRowIdx = r;
+      branchIdx = bIdx;
+      optionIdx = oIdx;
+      statusIdx = sIdx;
+      break;
+    }
+  }
+  
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    if (!rows[i] || rows[i].length === 0) continue;
+
+    let statusVal = '';
+    if (statusIdx >= 0) statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
+
+    let hasDeviceBranch = false;
+    let hasExcludeOption = false;
+    
+    if (branchIdx >= 0 && optionIdx >= 0) {
+      const branchVal = String(rows[i][branchIdx] || '').trim();
+      const optionVal = String(rows[i][optionIdx] || '').trim();
+      
+      if (branchVal.includes('3.무KT-우신(기기)(월☆통말)')) hasDeviceBranch = true;
+      if (optionVal.includes('민원') || optionVal.includes('추가지급')) hasExcludeOption = true;
+    } else {
+      for (let j = 0; j < rows[i].length; j++) {
+        const cellVal = String(rows[i][j] || '').trim();
+        if (cellVal.includes('3.무KT-우신(기기)(월☆통말)')) hasDeviceBranch = true;
+        if (cellVal.includes('민원') || cellVal.includes('추가지급')) hasExcludeOption = true;
+      }
+    }
+
+    if (!hasDeviceBranch) continue;
+
+    if (!isCompleted) {
+      const excludeStatuses = ['개통완료', '보류', '취소완료', '해지(철회)중', '해지(철회)완료', '반품요청', '반품완료'];
+      let isExcluded = false;
+      for (let st of excludeStatuses) {
+        if (statusVal.includes(st)) {
+          isExcluded = true;
+          break;
+        }
+      }
+      if (!isExcluded) {
+        deviceCount++;
+      }
+    } else {
+      if (!hasExcludeOption) {
+        deviceCount++;
+      }
+    }
+  }
+  
+  let targetId = isCompleted ? 'openMobileDevice' : 'installMobileDevice';
+  updateInput(targetId, deviceCount);
+  return `[${fileName}] 기기 ${deviceCount}건 반영됨`;
 }
 
 function updateInput(id, value) {
@@ -493,14 +669,12 @@ function savePartnerData(date, fileType, partnerCounts) {
     targetRow.partners = {};
   }
 
-  // 업로드한 타입에 대해서만 기존 수치 리셋
   for (let p in targetRow.partners) {
     if (targetRow.partners[p]) {
       targetRow.partners[p][fileType] = 0;
     }
   }
 
-  // 신규 값 누적
   for (let p in partnerCounts) {
     if (!targetRow.partners[p]) {
       targetRow.partners[p] = { internet: 0, usim: 0 };
@@ -508,7 +682,6 @@ function savePartnerData(date, fileType, partnerCounts) {
     targetRow.partners[p][fileType] = partnerCounts[p];
   }
 
-  // 카운트가 모두 0인 업체 정리
   for (let p in targetRow.partners) {
     const data = targetRow.partners[p];
     if (data.internet === 0 && data.usim === 0) {

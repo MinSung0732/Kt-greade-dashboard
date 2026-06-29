@@ -145,10 +145,19 @@
   }
 
   function computeMonthlySummary(rows, selectedDate, baseSummary) {
+    const selectedMonth = monthKey(selectedDate || baseSummary?.date);
     const monthRows = (Array.isArray(rows) ? rows : [])
-      .filter(row => row && row.date && row.date <= (selectedDate || "9999-99-99"));
+      .filter(row =>
+        row &&
+        row.date &&
+        (!selectedMonth || monthKey(row.date) === selectedMonth) &&
+        row.date <= (selectedDate || "9999-99-99")
+      )
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
-    const sum = { ...baseSummary };
+    const latest = monthRows[monthRows.length - 1] || {};
+    const sum = { ...baseSummary, ...latest };
     const keysToSum = [
       "open_online_internet", "open_online_tv", "open_online_main_tv", "open_online_extra",
       "open_wholesale_internet", "open_wholesale_tv", "open_wholesale_main_tv", "open_wholesale_extra",
@@ -160,11 +169,8 @@
       "install_mobile_device", "install_mobile_usim",
     ];
 
-    keysToSum.forEach(k => sum[k] = 0);
-    monthRows.forEach(r => {
-      keysToSum.forEach(k => {
-        sum[k] = Math.max(sum[k] || 0, number(r[k]));
-      });
+    keysToSum.forEach(k => {
+      sum[k] = number(latest[k] ?? baseSummary?.[k]);
     });
 
     sum.open_bundle_rate = sum.open_internet > 0 ? sum.open_main_tv / sum.open_internet : 0;
@@ -183,29 +189,17 @@
   }
 
   function getAccumulatedRow(rows, upToDate) {
-    const filtered = rows.filter(r => r.date <= upToDate);
+    const filtered = rows
+      .filter(r => r.date <= upToDate)
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
     if (!filtered.length) return null;
-    const result = { ...filtered[filtered.length - 1] };
-    const ignoreKeys = new Set([
-      "remaining_business_days", "passed_business_days", "target_count", "online_target_count",
-      "target_point", "remaining_count", "open_rate", "open_bundle_rate",
-      "open_online_bundle_rate", "open_wholesale_bundle_rate", "install_bundle_rate",
-      "install_online_bundle_rate", "install_wholesale_bundle_rate", "open_companion_rate",
-      "install_companion_rate", "daily_need"
-    ]);
-    filtered.forEach(r => {
-      Object.keys(r).forEach(k => {
-        if (typeof r[k] === 'number' && !ignoreKeys.has(k)) {
-          result[k] = Math.max(result[k] || 0, r[k]);
-        }
-      });
-    });
-    return result;
+    return { ...filtered[filtered.length - 1] };
   }
 
-  function createDailyComparison(rows, summary) {
+  function createDailyComparison(rows, summary, selectedDate) {
     const sourceRows = (Array.isArray(rows) ? rows : [])
-      .filter((row) => row && row.date)
+      .filter((row) => row && row.date && (!selectedDate || row.date <= selectedDate))
       .slice()
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const rawCurrent = sourceRows[sourceRows.length - 1];
@@ -357,7 +351,7 @@
     sheet.getCell(needRow, 11).numFmt = "#,##0\" 건\"";
   }
 
-  function addStatusTable(sheet, startRow, title, summary, prefix) {
+  function addStatusTable(sheet, startRow, title, summary, prefix, comparison) {
     const softAccent = prefix === "open" ? "EAF0F5" : "F2F0ED";
     const mobileTotal =
       number(summary[`${prefix}_mobile_usim`]) + number(summary[`${prefix}_mobile_device`]);
@@ -442,6 +436,7 @@
       fill: softAccent,
       font: { bold: true, size: 11, color: { argb: COLORS.navy } },
     });
+
     sheet.getCell(startRow + 2, 12).fill = fill("D9E2F3");
     sheet.getCell(startRow + 2, 12).font = { bold: true, size: 12, color: { argb: COLORS.navy } };
     sheet.getCell(startRow + 2, 6).numFmt = "0%";
@@ -450,15 +445,15 @@
     for (let row = startRow + 2; row <= startRow + 4; row += 1) {
       for (let col = 2; col <= 5; col += 1) {
         if (typeof sheet.getCell(row, col).value === "number") {
-          sheet.getCell(row, col).numFmt = "#,##0\" 건\"";
+          sheet.getCell(row, col).numFmt = "#,##0";
         }
       }
     }
     for (let col = 9; col <= 10; col += 1) {
-      sheet.getCell(startRow + 2, col).numFmt = "#,##0\" 건\"";
+      sheet.getCell(startRow + 2, col).numFmt = "#,##0";
     }
     sheet.getCell(startRow + 2, 11).numFmt = "0%";
-    sheet.getCell(startRow + 2, 12).numFmt = "#,##0\" 건\"";
+    sheet.getCell(startRow + 2, 12).numFmt = "#,##0";
   }
 
   function addTargetSection(sheet, row, summary, selectedDate) {
@@ -613,8 +608,8 @@
 
     addKpiStrip(sheet, 4, summary, comparison);
     addInternetGoalOverview(sheet, 7, comparison);
-    addStatusTable(sheet, 18, "개통 완료 상세 (월 누적)", monthlySummary, "open");
-    addStatusTable(sheet, 24, "가설중 상세 (월 누적)", monthlySummary, "install");
+    addStatusTable(sheet, 18, "개통 완료 상세 (월 누적)", monthlySummary, "open", comparison);
+    addStatusTable(sheet, 24, "가설중 상세 (월 누적)", monthlySummary, "install", comparison);
     sheet.pageSetup.printArea = "A1:L28";
     sheet.pageSetup.horizontalCentered = true;
     [3, 6, 17, 23].forEach((row) => {
@@ -1208,7 +1203,7 @@
     workbook.creator = "KT Grade Report";
     workbook.created = new Date();
     workbook.modified = new Date();
-    const comparison = createDailyComparison(rows, summary || {});
+    const comparison = createDailyComparison(rows, summary || {}, selectedDate);
     comparison.dateRangeLabel = buildDateRangeLabel(selectedDate, reportMonth);
     const reportSummary = comparison.current ? { ...comparison.current } : { ...(summary || {}) };
     if (summary) {

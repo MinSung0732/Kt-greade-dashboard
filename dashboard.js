@@ -299,14 +299,11 @@ function summarizeMonthlyRows(rows, currentRow, selectedMonth) {
     return summary;
   }
 
-  const summary = { ...monthRows[0] };
-  monthRows.forEach((row) => {
-    Object.keys(row).forEach((key) => {
-      if (typeof row[key] === "number") {
-        summary[key] = Math.max(summary[key] || 0, row[key]);
-      }
-    });
-  });
+  const latestRow = monthRows
+    .slice()
+    .sort((a, b) => new Date(`${a.date}T00:00:00`) - new Date(`${b.date}T00:00:00`))
+    [monthRows.length - 1];
+  const summary = { ...latestRow };
 
   summary.date = monthKey ? `${monthKey} 월 누적` : "-";
 
