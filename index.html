@@ -75,13 +75,13 @@
             </svg>
             <div class="gauge-value-box">
               <span class="percent" id="gaugePercentText">0%</span>
-              <span class="label">인터넷 달성률</span>
+              <span class="label">인터넷 목표달성률</span>
             </div>
           </div>
 
           <div class="progress-block">
             <div class="progress-copy">
-              <span>모바일 목표 달성률 <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
+              <span>모바일 목표 달성률<span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
               <strong id="mobileProgressText">0%</strong>
             </div>
             <div class="progress-track">
@@ -95,11 +95,11 @@
               <dd id="completedInternetSplitView">0 / 0</dd>
             </div>
             <div>
-              <dt>총 인터넷 개통완료</dt>
+              <dt>총 인터넷 개통예상</dt>
               <dd id="expectedInternetDetailView">0</dd>
             </div>
             <div>
-              <dt>인터넷 목표량</dt>
+              <dt>인터넷 목표수</dt>
               <dd id="internetTargetView">0</dd>
             </div>
             <div>
@@ -119,11 +119,11 @@
               <dd id="openMobileSplitView">0 / 0</dd>
             </div>
             <div>
-              <dt>총 모바일 개통완료</dt>
+              <dt>총 모바일 개통예상</dt>
               <dd id="expectedMobileDetailView">0</dd>
             </div>
             <div>
-              <dt>모바일 목표량</dt>
+              <dt>모바일 목표수</dt>
               <dd id="mobileTargetView">0</dd>
             </div>
             <div>
@@ -199,11 +199,11 @@
           </div>
           <dl class="metric-breakdown">
             <div>
-              <dt>개통완료 <span class="metric-hint">(메인+추단)</span></dt>
+              <dt>개통완료 <span class="metric-hint">(메인+추가)</span></dt>
               <dd id="completedOnlineTvView">0</dd>
             </div>
             <div>
-              <dt>가설중 <span class="metric-hint">(메인+추단)</span></dt>
+              <dt>가설중 <span class="metric-hint">(메인+추가)</span></dt>
               <dd id="installOnlineTvView">0</dd>
             </div>
           </dl>
@@ -235,11 +235,11 @@
           </div>
           <dl class="metric-breakdown">
             <div>
-              <dt>가설중 <span class="metric-hint">(메인+추단)</span></dt>
+              <dt>가설중 <span class="metric-hint">(메인+추가)</span></dt>
               <dd id="installWholesaleTvView">0</dd>
             </div>
             <div>
-              <dt>개통완료 <span class="metric-hint">(메인+추단)</span></dt>
+              <dt>개통완료 <span class="metric-hint">(메인+추가)</span></dt>
               <dd id="completedWholesaleTvView">0</dd>
             </div>
           </dl>
@@ -276,7 +276,7 @@
           <strong id="expectedMobileView">0</strong>
           <small id="expectedMobileDelta">비교 대기</small>
           <div style="margin-top: 14px; background: #f0f4f8; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; border: 1px solid #e1e7ef;">
-            메인회선 개통 <span id="mainDongpanUsimView" style="color: var(--blue); font-size: 14px; font-weight: 900; margin-left: 4px;">0</span>건
+            메인동반 개통 <span id="mainDongpanUsimView" style="color: var(--blue); font-size: 14px; font-weight: 900; margin-left: 4px;">0</span>건
           </div>
         </article>
         <article class="metric-card channel-card mirror-card accent-blue">
@@ -307,7 +307,7 @@
         <h2>목표달성 현황 <span style="font-size:13px;font-weight:700;color:var(--muted);">(개통완료 기준)</span></h2>
       </div>
       <section class="goal-summary-grid" aria-label="목표달성 현황">
-        <!-- ① TV+MU 합산 Point -->
+        <!-- TV+MU 합산 Point -->
         <article class="goal-dash-card goal-dash-tv">
           <div class="goal-dash-top">
             <span class="goal-dash-icon">🏆</span>
@@ -339,7 +339,7 @@
           </div>
         </article>
 
-        <!-- ② M/U 건수 -->
+        <!-- M/U 건수 -->
         <article class="goal-dash-card goal-dash-mu">
           <div class="goal-dash-top">
             <span class="goal-dash-icon">📱</span>
@@ -386,7 +386,7 @@
             <div class="panel-head">
               <div>
                 <p class="eyebrow">Internet</p>
-                <h2>인터넷 (온라인/도매) 일별 현황</h2>
+                <h2>인터넷(온라인/도매) 일별 현황</h2>
               </div>
             </div>
             <div style="position: relative; height:200px; width:100%">
@@ -457,15 +457,15 @@
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-    <script src="report-export.js?v=1782700200000"></script>
+    <script src="report-export.js?v=1782900000001"></script>
     <script src="config.js?v=1782309894630"></script>
-    <script src="utils.js?v=1782700200000"></script>
-    <script src="api.js?v=1782700200000"></script>
-    <script src="dom.js?v=1782700200000"></script>
+    <script src="utils.js?v=1782900000001"></script>
+    <script src="api.js?v=1782879000000"></script>
+    <script src="dom.js?v=1782900000001"></script>
     <script src="excel.js?v=1782700200001"></script>
-    <script src="chart.js?v=1782309894630"></script>
+    <script src="chart.js?v=1782900000001"></script>
     <script src="goal.js?v=1782309894630"></script>
-    <script src="dashboard.js?v=1782700200000"></script>
-    <script src="app.js?v=1782700200000"></script>
+    <script src="dashboard.js?v=1782900000001"></script>
+    <script src="app.js?v=1782900000001"></script>
   </body>
 </html>

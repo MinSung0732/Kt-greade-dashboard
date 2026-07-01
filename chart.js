@@ -2,13 +2,13 @@ function initChartFilters(rows) {
   const startInput = document.querySelector("#chartStartDate");
   const endInput = document.querySelector("#chartEndDate");
   if (!startInput || !endInput || startInput.value || endInput.value || !rows || !rows.length) return;
-  
-  const sortedRows = [...rows].sort((a, b) => a.date.localeCompare(b.date));
-  const maxDateText = sortedRows[sortedRows.length - 1].date;
+
+  const sortedRows = [...rows].sort((a, b) => getReportSortDate(a).localeCompare(getReportSortDate(b)));
+  const maxDateText = getReportSortDate(sortedRows[sortedRows.length - 1]);
   const maxDate = new Date(`${maxDateText}T00:00:00`);
-  
+
   endInput.value = maxDateText;
-  
+
   const startDate = new Date(maxDate);
   startDate.setDate(startDate.getDate() - 6);
   startInput.value = toDateInputValue(startDate);
@@ -24,17 +24,19 @@ function renderCharts(rows) {
   const startInput = document.querySelector("#chartStartDate")?.value;
   const endInput = document.querySelector("#chartEndDate")?.value;
 
-  let filteredRows = [...rows];
-  if (startInput) filteredRows = filteredRows.filter(r => r.date >= startInput);
-  if (endInput) filteredRows = filteredRows.filter(r => r.date <= endInput);
+  // A row's "date" is the day it was typed in; the figures it holds are
+  // the cumulative totals as of the day before, so charts bucket by that.
+  let filteredRows = rows.map((row) => ({ ...row, effectiveDate: getReportSortDate(row) }));
+  if (startInput) filteredRows = filteredRows.filter(r => r.effectiveDate >= startInput);
+  if (endInput) filteredRows = filteredRows.filter(r => r.effectiveDate <= endInput);
 
-  const sortedRows = filteredRows.sort((a, b) => a.date.localeCompare(b.date));
-  const labels = sortedRows.map(row => String(row.date).slice(5)); // MM-DD
-  
+  const sortedRows = filteredRows.sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
+  const labels = sortedRows.map(row => String(row.effectiveDate).slice(5)); // MM-DD
+
   const getDeltas = (key) => sortedRows.map((row, i) => {
     if (i === 0) return toNumber(row[key]);
     const prevRow = sortedRows[i - 1];
-    if (getMonthKey(row.date) === getMonthKey(prevRow.date)) {
+    if (getMonthKey(row.effectiveDate) === getMonthKey(prevRow.effectiveDate)) {
       return Math.max(0, toNumber(row[key]) - toNumber(prevRow[key]));
     }
     return toNumber(row[key]);

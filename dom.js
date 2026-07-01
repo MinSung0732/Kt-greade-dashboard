@@ -101,6 +101,43 @@ function isSettingsField(id) {
   ].includes(id);
 }
 
+function renderDeadlineMonthTarget() {
+  const el = document.querySelector("#deadlineMonthTarget");
+  if (!el) return;
+  const month = getSelectedMonthLabel();
+  if (!/^\d{4}-\d{2}$/.test(String(month || ""))) {
+    el.textContent = "보고 월별로 저장됩니다";
+    return;
+  }
+  const [year, mon] = month.split("-");
+  el.textContent = `현재 ${year}년 ${Number(mon)}월 마감일로 저장됩니다`;
+}
+
+function renderDeadlineManager() {
+  const list = document.querySelector("#deadlineManagerList");
+  if (!list) return;
+  const deadlines = parseMonthlyDeadlines(currentSettings.monthly_deadlines);
+  const months = Object.keys(deadlines).sort();
+
+  if (!months.length) {
+    list.innerHTML = '<li class="deadline-manager-empty">저장된 월별 마감일이 없습니다.</li>';
+    return;
+  }
+
+  list.innerHTML = months
+    .map((month) => {
+      const [year, mon] = month.split("-");
+      return `
+        <li data-month="${escapeHtml(month)}">
+          <span class="deadline-manager-month">${escapeHtml(year)}년 ${Number(mon)}월</span>
+          <input type="date" value="${escapeHtml(deadlines[month] || "")}" data-role="deadline-manager-input" />
+          <button type="button" data-role="deadline-manager-delete">삭제</button>
+        </li>
+      `;
+    })
+    .join("");
+}
+
 function openTiersModal() {
   const overlay = document.getElementById("tiersModalOverlay");
   if (!overlay) return;
@@ -205,7 +242,13 @@ async function resetTiersToDefault() {
 }
 
 function applySettings(settings) {
-  const deadlineDate = toDateInputText(settings.deadline_date) || currentSettings.deadline_date;
+  const monthlyDeadlines = parseMonthlyDeadlines(settings.monthly_deadlines || currentSettings.monthly_deadlines);
+  const reportMonth = getSelectedMonthLabel();
+  const deadlineDate = getDeadlineForMonth(reportMonth, {
+    ...currentSettings,
+    ...settings,
+    monthly_deadlines: monthlyDeadlines,
+  });
   currentSettings = {
     target_count: toNumber(settings.target_count || currentSettings.target_count),
     online_target_count: toNumber(
@@ -216,10 +259,19 @@ function applySettings(settings) {
     ),
     target_point: toNumber(settings.target_point || currentSettings.target_point),
     deadline_date: deadlineDate,
-    internet_open_rate: toPercentValue(settings.internet_open_rate || currentSettings.internet_open_rate),
-    tv_open_rate: toPercentValue(settings.tv_open_rate || currentSettings.tv_open_rate),
-    usim_open_rate: toPercentValue(settings.usim_open_rate || currentSettings.usim_open_rate),
-    device_open_rate: toPercentValue(settings.device_open_rate || currentSettings.device_open_rate),
+    monthly_deadlines: monthlyDeadlines,
+    internet_open_rate: toPercentValue(
+      settings.internet_open_rate !== undefined && settings.internet_open_rate !== "" ? settings.internet_open_rate : currentSettings.internet_open_rate,
+    ),
+    tv_open_rate: toPercentValue(
+      settings.tv_open_rate !== undefined && settings.tv_open_rate !== "" ? settings.tv_open_rate : currentSettings.tv_open_rate,
+    ),
+    usim_open_rate: toPercentValue(
+      settings.usim_open_rate !== undefined && settings.usim_open_rate !== "" ? settings.usim_open_rate : currentSettings.usim_open_rate,
+    ),
+    device_open_rate: toPercentValue(
+      settings.device_open_rate !== undefined && settings.device_open_rate !== "" ? settings.device_open_rate : currentSettings.device_open_rate,
+    ),
     tvmu_tiers: settings.tvmu_tiers || currentSettings.tvmu_tiers,
     mu_tiers: settings.mu_tiers || currentSettings.mu_tiers,
   };
@@ -256,6 +308,17 @@ function applySettings(settings) {
   setRateSettingValue("tvOpenRate", settings.tv_open_rate, 75);
   setRateSettingValue("usimOpenRate", settings.usim_open_rate, 50);
   setRateSettingValue("deviceOpenRate", settings.device_open_rate, 50);
+
+  renderDeadlineMonthTarget();
+  renderDeadlineManager();
+}
+
+function syncDeadlineDateForReportMonth() {
+  const reportMonth = getSelectedMonthLabel();
+  const deadlineDate = getDeadlineForMonth(reportMonth);
+  if (deadlineDate) setInputValue("deadlineDate", deadlineDate);
+  renderDeadlineMonthTarget();
+  renderDashboard(getDashboardSummary());
 }
 
 function setConnectionState(connected) {

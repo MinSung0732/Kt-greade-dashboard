@@ -1,4 +1,4 @@
-function getApiUrl() {
+﻿function getApiUrl() {
   return String(APP_CONFIG.apiUrl || "").trim();
 }
 
@@ -96,6 +96,9 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  const reportMonth = getSelectedMonthLabel();
+  const deadlineDate = getInputValue("deadlineDate") || getDeadlineForMonth(reportMonth);
+  const monthlyDeadlines = setMonthlyDeadline(reportMonth, deadlineDate);
   const settings = {
     target_count: toNumber(getInputValue("targetCount") || currentSettings.target_count),
     online_target_count: toNumber(
@@ -105,7 +108,8 @@ async function saveSettings() {
       getInputValue("muTargetCount") || currentSettings.mu_target_count,
     ),
     target_point: toNumber(getInputValue("targetPoint") || currentSettings.target_point),
-    deadline_date: getInputValue("deadlineDate") || currentSettings.deadline_date,
+    deadline_date: deadlineDate,
+    monthly_deadlines: monthlyDeadlines,
     internet_open_rate: toNumber(getInputValue("internetOpenRate") || currentSettings.internet_open_rate),
     tv_open_rate: toNumber(getInputValue("tvOpenRate") || currentSettings.tv_open_rate),
     usim_open_rate: toNumber(getInputValue("usimOpenRate") || currentSettings.usim_open_rate),
@@ -119,6 +123,7 @@ async function saveSettings() {
     const apiUrl = getApiUrl();
     if (!apiUrl) {
       applySettings(settings);
+      localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
       showMessage("설정이 로컬에 임시 저장되었습니다.");
       return;
     }
@@ -136,6 +141,7 @@ async function saveSettings() {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "설정 저장 오류");
     applySettings(data.settings || settings);
+    localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(data.settings || settings));
     dashboardRows = normalizeRows(dashboardRows);
     setCachedRows(dashboardRows);
     renderHistory(dashboardRows);

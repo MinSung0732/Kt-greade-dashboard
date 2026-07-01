@@ -20,6 +20,29 @@ let filterState = {
 
 let currentFilteredList = [];
 let currentLabels = { currentLabel: '이번달', prevLabel: '지난달' };
+let sortState = { key: 'thisPeriodCount', dir: 'desc' };
+let lastUnsortedList = [];
+let lastTotals = { current: null, prev: null };
+
+function sortFilteredList(list) {
+  const { key, dir } = sortState;
+  const factor = dir === 'asc' ? 1 : -1;
+  const isTextKey = key === 'name' || key === 'latestDate';
+  return list.slice().sort((a, b) => {
+    const cmp = isTextKey
+      ? String(a[key]).localeCompare(String(b[key]), 'ko')
+      : (a[key] || 0) - (b[key] || 0);
+    if (cmp !== 0) return cmp * factor;
+    return a.name.localeCompare(b.name, 'ko');
+  });
+}
+
+function rerenderSortedTable() {
+  const sortedList = sortFilteredList(lastUnsortedList);
+  renderSummaryCards(sortedList, currentLabels.currentLabel, currentLabels.prevLabel, lastTotals.current, lastTotals.prev);
+  renderDynamicTable(sortedList, currentLabels.currentLabel, currentLabels.prevLabel);
+  currentFilteredList = sortedList;
+}
 
 function initInputs() {
   const now = new Date();
@@ -34,8 +57,9 @@ function initInputs() {
     filterState.date = todayStr;
   }
 
-  // 보고 월 & 비교 월 기본값
-  const currentMonthStr = todayStr.slice(0, 7);
+  // 보고 월 & 비교 월 기본값 (오늘이 실제로 설명하는 전날 기준 월)
+  const effectiveToday = (typeof getEffectiveDate === "function" && getEffectiveDate(todayStr)) || todayStr;
+  const currentMonthStr = effectiveToday.slice(0, 7);
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastMonthStr = getFormatDate(lastMonthDate).slice(0, 7);
 
@@ -81,8 +105,12 @@ function normalizePartnerRows(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map(row => {
       const partners = row.partners || (row.partner_data ? (typeof row.partner_data === "string" ? JSON.parse(row.partner_data) : row.partner_data) : {});
+      const rawDate = String(row.date || "").slice(0, 10);
+      // A row's "date" is the day it was typed in; the totals/partner counts
+      // it holds are the cumulative totals as of the day before (its
+      // effective date) - so that's the day this snapshot should describe.
       return {
-        date: String(row.date || "").slice(0, 10),
+        date: (typeof getEffectiveDate === "function" && getEffectiveDate(rawDate)) || rawDate,
         partners,
         totals: {
           internet: toNumber(row.open_internet) || toNumber(row.open_online_internet) + toNumber(row.open_wholesale_internet),
@@ -130,10 +158,11 @@ function bindEvents() {
   });
   document.getElementById("date")?.addEventListener("change", (e) => {
     filterState.date = e.target.value;
-    // 기준일 변경 시 보고 월도 자동으로 연동
+    // 기준일 변경 시 보고 월도 자동으로 연동 (그 날짜가 실제로 설명하는 전날 기준 월)
     const reportMonthInput = document.getElementById("reportMonth");
     if (reportMonthInput && e.target.value) {
-      const monthVal = e.target.value.slice(0, 7);
+      const effectiveDate = (typeof getEffectiveDate === "function" && getEffectiveDate(e.target.value)) || e.target.value;
+      const monthVal = effectiveDate.slice(0, 7);
       reportMonthInput.value = monthVal;
       filterState.reportMonth = monthVal;
     }
@@ -142,6 +171,20 @@ function bindEvents() {
 
   // 검색 필터 이벤트
   document.getElementById("partnerSearchInput")?.addEventListener("input", filterTable);
+
+  // 표 헤더 클릭 정렬
+  document.getElementById("partnerTableHead")?.addEventListener("click", (e) => {
+    const th = e.target.closest("th[data-sort-key]");
+    if (!th) return;
+    const key = th.dataset.sortKey;
+    if (sortState.key === key) {
+      sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortState.key = key;
+      sortState.dir = (key === 'name' || key === 'latestDate') ? 'asc' : 'desc';
+    }
+    rerenderSortedTable();
+  });
 
   // 분류 탭 (인터넷 / 유심)
   const categoryButtons = document.querySelectorAll("#categoryTab button");
@@ -236,24 +279,20 @@ async function loadAndRenderData() {
   // 가독성 개선: 이번 기간 및 지난 기간 둘 다 실적이 0인 업체는 화면에서 완전히 제외
   const filteredList = partnerList.filter(p => p.thisPeriodCount > 0 || p.prevPeriodCount > 0);
 
-  // 정렬: 이번 기간 개통완료 건수 높은 순 -> 이름 가나다 순
-  filteredList.sort((a, b) => {
+  // 5. 정렬 상태 및 다음 재정렬을 위한 캐시 저장
+  lastUnsortedList = filteredList;
+  lastTotals = { current: currentTotals, prev: prevTotals };
+  currentLabels = { currentLabel: periodRanges.currentLabel, prevLabel: periodRanges.prevLabel };
+
+  // 5.5 명예의 전당 리더보드 갱신 (표 정렬과 무관하게 항상 이번 기간 건수 기준)
+  const leaderboardList = filteredList.slice().sort((a, b) => {
     if (b.thisPeriodCount !== a.thisPeriodCount) return b.thisPeriodCount - a.thisPeriodCount;
     return a.name.localeCompare(b.name, "ko");
   });
+  renderLeaderboard(leaderboardList);
 
-  // 5. 대시보드 요약 정보 카드 갱신
-  renderSummaryCards(filteredList, periodRanges.currentLabel, periodRanges.prevLabel, currentTotals, prevTotals);
-
-  // 5.5 명예의 전당 리더보드 갱신
-  renderLeaderboard(filteredList);
-
-  // 6. 테이블 렌더링
-  renderDynamicTable(filteredList, periodRanges.currentLabel, periodRanges.prevLabel);
-
-  // 7. 글로벌 캐시 저장 (다운로드용)
-  currentFilteredList = filteredList;
-  currentLabels = { currentLabel: periodRanges.currentLabel, prevLabel: periodRanges.prevLabel };
+  // 6. 요약 카드 + 테이블 렌더링 (현재 정렬 상태 적용)
+  rerenderSortedTable();
 }
 
 // 필터 상태(일간/주간/월간)에 맞는 날짜 범위 및 라벨 획득
@@ -262,23 +301,28 @@ function getPeriodRanges() {
   let currentStart = '', currentEnd = '', prevStart = '', prevEnd = '';
   let currentLabel = '', prevLabel = '';
 
-  if (state.period === 'daily') {
-    const prevBusinessDate = getPreviousBusinessDate(state.date);
+  // Row dates are now stored as effective dates (see normalizePartnerRows),
+  // so the "조회 기준일" the user typed must be compared the same way - it
+  // describes the day before it, not itself.
+  const effectiveDate = (typeof getEffectiveDate === "function" && getEffectiveDate(state.date)) || state.date;
 
-    currentStart = state.date;
-    currentEnd = state.date;
+  if (state.period === 'daily') {
+    const prevBusinessDate = getPreviousBusinessDate(effectiveDate);
+
+    currentStart = effectiveDate;
+    currentEnd = effectiveDate;
     prevStart = prevBusinessDate;
     prevEnd = prevStart;
 
     currentLabel = '오늘';
     prevLabel = '어제';
   } else if (state.period === 'weekly') {
-    const baseDate = new Date(`${state.date}T00:00:00`);
+    const baseDate = new Date(`${effectiveDate}T00:00:00`);
     const mondayOffset = (baseDate.getDay() + 6) % 7;
     const currentStartDate = new Date(baseDate);
     currentStartDate.setDate(baseDate.getDate() - mondayOffset);
     currentStart = getFormatDate(currentStartDate);
-    currentEnd = state.date;
+    currentEnd = effectiveDate;
 
     const prevEndDate = new Date(currentStartDate);
     prevEndDate.setDate(currentStartDate.getDate() - 1);
@@ -293,8 +337,8 @@ function getPeriodRanges() {
   } else {
     // 월간
     currentStart = state.reportMonth + "-01";
-    currentEnd = state.date && state.date.slice(0, 7) === state.reportMonth
-      ? state.date
+    currentEnd = effectiveDate && effectiveDate.slice(0, 7) === state.reportMonth
+      ? effectiveDate
       : state.reportMonth + "-31";
 
     prevStart = state.compareMonth + "-01";
@@ -477,15 +521,16 @@ function renderDynamicTable(filteredList, currentLabel, prevLabel) {
 
   const categoryKo = filterState.category === 'internet' ? '인터넷' : '유심';
 
-  // 1. 헤더 그리기
+  // 1. 헤더 그리기 (클릭 정렬 가능)
+  const sortArrow = (key) => sortState.key === key ? `<span class="sort-arrow">${sortState.dir === 'asc' ? '▲' : '▼'}</span>` : '';
   thead.innerHTML = `
     <tr>
-      <th style="vertical-align: middle;">협력점명</th>
-      <th class="number-cell">${currentLabel} (${categoryKo})</th>
-      <th class="number-cell">${prevLabel} (${categoryKo})</th>
-      <th class="number-cell" style="text-align: right;">차이</th>
-      <th style="text-align: center;">최근 개통일</th>
-      <th class="number-cell" style="text-align: right;">최근 개통수 (${categoryKo})</th>
+      <th style="vertical-align: middle;" class="sortable-th" data-sort-key="name">협력점명${sortArrow('name')}</th>
+      <th class="number-cell sortable-th" data-sort-key="thisPeriodCount">${currentLabel} (${categoryKo})${sortArrow('thisPeriodCount')}</th>
+      <th class="number-cell sortable-th" data-sort-key="prevPeriodCount">${prevLabel} (${categoryKo})${sortArrow('prevPeriodCount')}</th>
+      <th class="number-cell sortable-th" data-sort-key="diffCount" style="text-align: right;">차이${sortArrow('diffCount')}</th>
+      <th class="sortable-th" data-sort-key="latestDate" style="text-align: center;">최근 개통일${sortArrow('latestDate')}</th>
+      <th class="number-cell sortable-th" data-sort-key="latestCount" style="text-align: right;">최근 개통수 (${categoryKo})${sortArrow('latestCount')}</th>
     </tr>
   `;
 

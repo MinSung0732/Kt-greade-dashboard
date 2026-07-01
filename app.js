@@ -1,4 +1,4 @@
-const fieldIds = [
+﻿const fieldIds = [
   "date",
   "targetCount",
   "onlineTargetCount",
@@ -57,6 +57,7 @@ let currentSettings = {
   mu_target_count: 600,
   target_point: 0,
   deadline_date: "",
+  monthly_deadlines: {},
   internet_open_rate: 75,
   tv_open_rate: 75,
   usim_open_rate: 50,
@@ -102,6 +103,7 @@ function bindEvents() {
         clearDailyInputs();
       }
     }
+    renderDeadlineMonthTarget();
     debouncedRenderDashboard();
   });
   document.querySelector("#reportMonth")?.addEventListener("change", async () => {
@@ -121,13 +123,65 @@ function bindEvents() {
         }
       }
     }
+    syncDeadlineDateForReportMonth();
     await loadRecentRows();
   });
   document.querySelector("#targetCount")?.addEventListener("input", debouncedRenderDashboard);
   document.querySelector("#onlineTargetCount")?.addEventListener("input", debouncedRenderDashboard);
   document.querySelector("#muTargetCount")?.addEventListener("input", debouncedRenderDashboard);
   document.querySelector("#targetPoint")?.addEventListener("input", debouncedRenderDashboard);
-  document.querySelector("#deadlineDate")?.addEventListener("input", debouncedRenderDashboard);
+  document.querySelector("#deadlineDate")?.addEventListener("input", () => {
+    updateSelectedMonthDeadline(getInputValue("deadlineDate"));
+    renderDeadlineManager();
+    debouncedRenderDashboard();
+  });
+  document.querySelector("#toggleDeadlineManagerBtn")?.addEventListener("click", () => {
+    const list = document.querySelector("#deadlineManagerList");
+    const addRow = document.querySelector("#deadlineManagerAdd");
+    if (!list) return;
+    const willShow = list.hidden;
+    list.hidden = !willShow;
+    if (addRow) addRow.hidden = !willShow;
+    if (willShow) renderDeadlineManager();
+  });
+  document.querySelector("#addDeadlineBtn")?.addEventListener("click", async () => {
+    const month = getInputValue("addDeadlineMonth");
+    const date = getInputValue("addDeadlineDate");
+    if (!month || !date) {
+      showMessage("대상 월과 마감일을 모두 입력하세요.");
+      return;
+    }
+    currentSettings.monthly_deadlines = setMonthlyDeadline(month, date);
+    await saveSettings();
+    renderDeadlineManager();
+    document.querySelector("#addDeadlineMonth").value = "";
+    document.querySelector("#addDeadlineDate").value = "";
+    if (getSelectedMonthLabel() === month) {
+      syncDeadlineDateForReportMonth();
+    }
+  });
+  document.querySelector("#deadlineManagerList")?.addEventListener("change", async (event) => {
+    const target = event.target;
+    if (target?.dataset?.role !== "deadline-manager-input") return;
+    const month = target.closest("li")?.dataset?.month;
+    if (!month || !target.value) return;
+    currentSettings.monthly_deadlines = setMonthlyDeadline(month, target.value);
+    await saveSettings();
+    renderDeadlineManager();
+  });
+  document.querySelector("#deadlineManagerList")?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (target?.dataset?.role !== "deadline-manager-delete") return;
+    const month = target.closest("li")?.dataset?.month;
+    if (!month) return;
+    if (!window.confirm(`${month} 마감일을 삭제할까요?`)) return;
+    currentSettings.monthly_deadlines = deleteMonthlyDeadline(month);
+    await saveSettings();
+    renderDeadlineManager();
+    if (getSelectedMonthLabel() === month) {
+      syncDeadlineDateForReportMonth();
+    }
+  });
   document.querySelector("#internetOpenRate")?.addEventListener("input", debouncedRenderDashboard);
   document.querySelector("#tvOpenRate")?.addEventListener("input", debouncedRenderDashboard);
   document.querySelector("#usimOpenRate")?.addEventListener("input", debouncedRenderDashboard);
@@ -188,13 +242,16 @@ async function downloadDashboardReport() {
     const currentRow = readForm();
     const rowsWithCurrent = form ? upsertByDate(dashboardRows, currentRow) : dashboardRows;
     const selectedDate = getInputValue("date");
-    const summary = summarizeMonthlyRows(rowsWithCurrent, currentRow, getSelectedMonthLabel());
+    const reportMonth = getSelectedMonthLabel();
+    const cutoffDate = getReportCutoffDate(selectedDate, reportMonth);
+    const summary = summarizeMonthlyRows(rowsWithCurrent, currentRow, reportMonth);
 
     await window.KTReportExporter.download({
       summary,
       rows: rowsWithCurrent,
       selectedDate,
-      reportMonth: getSelectedMonthLabel(),
+      cutoffDate,
+      reportMonth,
       settings: typeof currentSettings !== "undefined" ? currentSettings : {},
     });
     showMessage("엑셀 보고서를 다운로드했습니다.");
@@ -280,7 +337,7 @@ async function compareWithPreviousDay() {
 
   if (!previous) {
     renderDashboard(current);
-    showMessage("비교할 전날 데이터 없음");
+    showMessage("비교할 전날 데이터가 없습니다.");
     return;
   }
 

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const COLORS = {
@@ -32,13 +32,25 @@
   }
 
   function normalizedRate(rawValue, fallbackValue, defaultPercent) {
-    const fallback = number(fallbackValue);
-    const raw = number(rawValue) || fallback || number(defaultPercent);
+    const hasRaw = rawValue !== undefined && rawValue !== null && rawValue !== "";
+    const hasFallback = fallbackValue !== undefined && fallbackValue !== null && fallbackValue !== "";
+    const raw = hasRaw ? number(rawValue) : (hasFallback ? number(fallbackValue) : number(defaultPercent));
     return raw > 1 ? raw / 100 : raw;
   }
 
   function monthKey(value) {
     return String(value || "").slice(0, 7);
+  }
+
+  // Every row's "date" is the day it was typed in (the following morning);
+  // the figures it holds are the cumulative totals as of the day before.
+  function getEffectiveDate(dateText) {
+    if (!dateText) return "";
+    const date = new Date(`${dateText}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return "";
+    date.setDate(date.getDate() - 1);
+    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return offsetDate.toISOString().slice(0, 10);
   }
 
   function border(color = COLORS.border) {
@@ -135,32 +147,74 @@
     sheet.getRow(row + 1).height = 31;
   }
 
-  function buildDateRangeLabel(selectedDate, reportMonth) {
+  function getMonthEndDate(month) {
+    if (!/^\d{4}-\d{2}$/.test(String(month || ""))) return "";
+    const [year, mon] = month.split("-").map(Number);
+    return `${year}-${String(mon).padStart(2, "0")}-${String(new Date(year, mon, 0).getDate()).padStart(2, "0")}`;
+  }
+
+  function getNextMonthFirstDate(month) {
+    if (!/^\d{4}-\d{2}$/.test(String(month || ""))) return "";
+    const [year, mon] = month.split("-").map(Number);
+    return `${new Date(year, mon, 1).getFullYear()}-${String(new Date(year, mon, 1).getMonth() + 1).padStart(2, "0")}-01`;
+  }
+
+  // Returns a raw "date field" value (not an effective date) marking the
+  // cutoff to compare row.date against. For a month other than the one
+  // being typed in, that's the following month's 1st - since a row's raw
+  // date is always one day ahead of the day its figures describe, this is
+  // the raw value a final entry for that month would carry.
+  function getReportCutoffDate(selectedDate, reportMonth) {
+    const selectedMonth = monthKey(selectedDate);
+    if (!reportMonth) return selectedDate || "";
+    if (!selectedDate || selectedMonth !== reportMonth) return getNextMonthFirstDate(reportMonth);
+    return selectedDate;
+  }
+
+  function rowReportMonth(row) {
+    return String(row?.report_month || "").slice(0, 7) || monthKey(row?.date);
+  }
+
+  function rowBelongsToReportMonth(row, reportMonth) {
+    if (!reportMonth) return true;
+    const explicitReportMonth = String(row?.report_month || "").slice(0, 7);
+    if (explicitReportMonth) return explicitReportMonth === reportMonth;
+    return monthKey(getEffectiveDate(row?.date)) === reportMonth;
+  }
+
+  // Sort/compare key reflecting the day a row's figures actually describe
+  // (the day before it was typed in), not the literal "date" field.
+  function getReportSortDate(row) {
+    return getEffectiveDate(row?.date) || String(row?.date || "");
+  }
+
+  function buildDateRangeLabel(selectedDate, reportMonth, cutoffDate) {
     try {
       const base = selectedDate ? new Date(selectedDate) : new Date();
       const month = reportMonth || `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}`;
       const [year, mon] = month.split("-").map(Number);
       const firstDay = `${year}-${String(mon).padStart(2, "0")}-01`;
-      const prevDate = new Date(base);
-      prevDate.setDate(prevDate.getDate() - 1);
-      const prevStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-${String(prevDate.getDate()).padStart(2, "0")}`;
-      return `${firstDay} ~ ${prevStr}`;
+      const rawCutoff = cutoffDate || getReportCutoffDate(selectedDate, month);
+      const displayCutoff = getEffectiveDate(rawCutoff) || rawCutoff;
+      return `${firstDay} ~ ${displayCutoff}`;
     } catch (e) {
       return selectedDate || "-";
     }
   }
 
-  function computeMonthlySummary(rows, selectedDate, baseSummary, settings) {
-    const selectedMonth = monthKey(selectedDate || baseSummary?.date);
+  function computeMonthlySummary(rows, selectedDate, baseSummary, settings, reportMonth, cutoffDate) {
+    const selectedMonth = reportMonth || monthKey(selectedDate || baseSummary?.date);
+    const effectiveCutoff = cutoffDate || getReportCutoffDate(selectedDate, selectedMonth);
+    const effectiveCutoffKey = getEffectiveDate(effectiveCutoff) || "9999-99-99";
     const monthRows = (Array.isArray(rows) ? rows : [])
       .filter(row =>
         row &&
         row.date &&
-        (!selectedMonth || monthKey(row.date) === selectedMonth) &&
-        row.date <= (selectedDate || "9999-99-99")
+        rowBelongsToReportMonth(row, selectedMonth) &&
+        getReportSortDate(row) <= effectiveCutoffKey
       )
       .slice()
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      .sort((a, b) => getReportSortDate(a).localeCompare(getReportSortDate(b)));
 
     const latest = monthRows[monthRows.length - 1] || {};
     const sum = { ...baseSummary, ...latest };
@@ -186,7 +240,7 @@
     sum.install_online_bundle_rate = sum.install_online_internet > 0 ? sum.install_online_main_tv / sum.install_online_internet : 0;
     sum.install_wholesale_bundle_rate = sum.install_wholesale_internet > 0 ? sum.install_wholesale_main_tv / sum.install_wholesale_internet : 0;
 
-    const internetRate = normalizedRate(settings?.internet_open_rate, baseSummary?.internet_open_rate_setting, 75);
+    const internetRate = baseSummary?.report_closed ? 0 : normalizedRate(settings?.internet_open_rate, baseSummary?.internet_open_rate_setting, 75);
     sum.expected_internet = sum.open_internet + Math.floor(sum.install_internet * internetRate);
     sum.open_companion_rate = sum.expected_internet > 0 ? Math.floor((number(sum.main_dongpan_usim) / sum.expected_internet) * 100) / 100 : 0;
 
@@ -195,23 +249,31 @@
 
   function getAccumulatedRow(rows, upToDate) {
     const filtered = rows
-      .filter(r => r.date <= upToDate)
+      .filter(r => getReportSortDate(r) <= upToDate)
       .slice()
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      .sort((a, b) => getReportSortDate(a).localeCompare(getReportSortDate(b)));
     if (!filtered.length) return null;
     return { ...filtered[filtered.length - 1] };
   }
 
-  function createDailyComparison(rows, summary, selectedDate, settings) {
+  function createDailyComparison(rows, summary, selectedDate, settings, cutoffDate, reportMonth) {
+    const effectiveCutoff = cutoffDate || selectedDate;
+    const selectedMonth = reportMonth || rowReportMonth(summary) || monthKey(selectedDate);
+    const effectiveCutoffKey = getEffectiveDate(effectiveCutoff) || "9999-99-99";
     const sourceRows = (Array.isArray(rows) ? rows : [])
-      .filter((row) => row && row.date && (!selectedDate || row.date <= selectedDate))
+      .filter((row) =>
+        row &&
+        row.date &&
+        rowBelongsToReportMonth(row, selectedMonth) &&
+        getReportSortDate(row) <= effectiveCutoffKey
+      )
       .slice()
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      .sort((a, b) => getReportSortDate(a).localeCompare(getReportSortDate(b)));
     const rawCurrent = sourceRows[sourceRows.length - 1];
     const rawPrevious = sourceRows[sourceRows.length - 2];
-    const current = rawCurrent ? getAccumulatedRow(sourceRows, rawCurrent.date) : null;
-    const previous = rawPrevious ? getAccumulatedRow(sourceRows, rawPrevious.date) : null;
-    const internetRate = normalizedRate(settings?.internet_open_rate, summary?.internet_open_rate_setting || current?.internet_open_rate_setting, 75);
+    const current = rawCurrent ? getAccumulatedRow(sourceRows, getReportSortDate(rawCurrent)) : null;
+    const previous = rawPrevious ? getAccumulatedRow(sourceRows, getReportSortDate(rawPrevious)) : null;
+    const internetRate = summary?.report_closed ? 0 : normalizedRate(settings?.internet_open_rate, summary?.internet_open_rate_setting || current?.internet_open_rate_setting, 75);
     const definitions = [
       ["온라인", "open_online_internet", "install_online_internet"],
       ["도매", "open_wholesale_internet", "install_wholesale_internet"],
@@ -246,8 +308,8 @@
   }
 
   function comparisonLabel(label, diff) {
-    if (diff === null || diff === undefined) return `${label} (기준 데이터 없음)`;
-    return `${label} (기준대비 ${diff > 0 ? "+" : ""}${diff})`;
+    if (diff === null || diff === undefined) return `${label} (비교 데이터 없음)`;
+    return `${label} (직전대비 ${diff > 0 ? "+" : ""}${diff})`;
   }
 
   function addInternetGoalOverview(sheet, row, comparison) {
@@ -288,7 +350,7 @@
 
       const lines = [
         [comparisonLabel("개통", channel.openDiff), channel.open, "", ""],
-        [comparisonLabel("가설", channel.installDiff), channel.install, channel.installExpected, comparison.internetRate],
+        [comparisonLabel("가설중", channel.installDiff), channel.install, channel.installExpected, comparison.internetRate],
         ["개통예상 개수 (개통+가설예상)", channel.expected, "", ""],
       ];
       lines.forEach((values, lineIndex) => {
@@ -383,7 +445,7 @@
 
     setRangeRow(sheet, startRow + 1, 8, [
       "구분",
-      "유심(U)",
+      "USIM(U)",
       "기기(M)",
       "동판율",
       "합계",
@@ -508,7 +570,7 @@
       "마감일",
       summary.deadline_date || "-",
       "남은 영업일",
-      `${number(summary.remaining_business_days)}일`,
+      summary.report_closed || number(summary.remaining_business_days) <= 0 ? "영업마감" : `${number(summary.remaining_business_days)}일`,
       "",
       "",
     ], { fill: COLORS.paleGray, font: { bold: true } });
@@ -603,7 +665,7 @@
     });
     sheet.mergeCells("A2:L2");
     const reportDateRange = buildDateRangeLabel(selectedDate, reportMonth);
-    sheet.getCell("A2").value = `보고 월: ${reportMonth || "-"}  |  기준: ${reportDateRange}`;
+    sheet.getCell("A2").value = `보고 월 ${reportMonth || "-"}  |  기준: ${reportDateRange}`;
     styleRange(sheet, "A2:L2", {
       fill: COLORS.paleGray,
       font: { bold: true, color: { argb: COLORS.navy } },
@@ -649,16 +711,15 @@
       },
     });
 
-    // A(공백) B(구분) C~F(현황데이터) G~J(실개통데이터)
+    // A blank, B label, C~F status data, G~J open-only data.
     [2, 18, 14, 14, 14, 14, 16, 14, 14, 14].forEach((width, index) => {
       sheet.getColumn(index + 1).width = width;
     });
 
     const targetPoint = number(summary?.target_point) || number(settings?.target_point) || 3500;
 
-    // ── 제목 / 소제목 ──────────────────────────────────────────
     sheet.mergeCells("B2:G2");
-    sheet.getCell("B2").value = "2. 유선도매 온라인 매출UP! 정책 (point목표달성)";
+    sheet.getCell("B2").value = "2. 유선/무선 결합 매출UP! 정책 (point 목표달성)";
     sheet.getCell("B2").font = { size: 12, name: "맑은 고딕", bold: true };
     sheet.getRow(2).height = 22;
 
@@ -667,22 +728,19 @@
     sheet.getCell("B3").font = { size: 10, name: "맑은 고딕", color: { argb: "595959" } };
     sheet.getRow(3).height = 18;
 
-    // ── 섹션 타이틀: 정책 그레이드 구간 ───────────────────────
     sheet.mergeCells("B5:G5");
-    sheet.getCell("B5").value = "■ 정책 그레이드 구간";
+    sheet.getCell("B5").value = "정책 그레이드 구간";
     sheet.getCell("B5").font = { size: 11, name: "맑은 고딕", bold: true, color: { argb: COLORS.navy } };
     sheet.getCell("B5").fill = fill("D9E2F3");
     sheet.getCell("B5").alignment = { horizontal: "left", vertical: "middle" };
     sheet.getRow(5).height = 24;
 
-    // ── 그레이드 구간 헤더 ──────────────────────────────────────
     sheet.mergeCells("B6:B8");
     sheet.getCell("B6").value = "상품 구분";
     sheet.mergeCells("C6:D6");
     sheet.getCell("C6").value = "TV";
     sheet.mergeCells("E6:F6");
     sheet.getCell("E6").value = "M/U";
-    // 마지막 열(G)은 5번째 데이터용 — 헤더엔 빈 칸으로 병합
     sheet.mergeCells("G6:G8");
 
     setRangeRow(sheet, 7, 3, ["기본단말", "추가단말", "M", "U"], "C7:F7", {
@@ -702,7 +760,7 @@
     styleRange(sheet, "B6:B8", { fill: "E7E6E6", font: { bold: true, name: "맑은 고딕" } });
     [6, 7, 8].forEach(r => { sheet.getRow(r).height = 22; });
 
-    // ── 데이터 미리 계산 (구간 달성치 확인용) ─────────────────────────
+    // Pre-calculate status values.
     const mainTvOpen = number(monthlySummary.open_main_tv);
     const extraTvOpen = number(monthlySummary.open_extra_device);
     const muOpen = number(monthlySummary.open_mobile_device) + number(monthlySummary.open_mobile_usim);
@@ -713,8 +771,8 @@
     const uInstall = number(monthlySummary.install_mobile_usim);
     const muInstall = mInstall + uInstall;
 
-    const tvRate = normalizedRate(settings?.tv_open_rate, summary.tv_open_rate_setting, 75);
-    const muRate = normalizedRate(settings?.usim_open_rate, summary.usim_open_rate_setting, 50);
+    const tvRate = summary.report_closed ? 0 : normalizedRate(settings?.tv_open_rate, summary.tv_open_rate_setting, 75);
+    const muRate = summary.report_closed ? 0 : normalizedRate(settings?.usim_open_rate, summary.usim_open_rate_setting, 50);
 
     const mainTvExpected = Math.floor(mainTvInstall * tvRate);
     const extraTvExpected = Math.floor(extraTvInstall * tvRate);
@@ -726,7 +784,7 @@
     const achievedPoint = mainTvTotal * 2 + extraTvTotal + muTotal * 2;
     const actualOpenPoint = mainTvOpen * 2 + extraTvOpen + muOpen * 2;
 
-    // ── 그레이드 구간 데이터 (5열씩) ───────────────────────────
+    // Grade tiers, five items per row.
     let startRow = 9;
 
     let tvmuTiersList = [];
@@ -766,7 +824,7 @@
           sheet.getCell(`${col}${r1}`).value = `${p.point.toLocaleString()} Point`;
           sheet.getCell(`${col}${r2}`).value = `${p.payment.toLocaleString()} 만원`;
 
-          // 달성한 목표에 색상 부여
+          // Highlight achieved tiers.
           if (actualOpenPoint >= p.point) {
             sheet.getCell(`${col}${r1}`).fill = fill("FFE699");
             sheet.getCell(`${col}${r2}`).fill = fill("FFF2CC");
@@ -780,11 +838,11 @@
       sheet.getRow(r2).height = 28;
     });
 
-    // ── 현황 테이블 ────────────────────────────────────────────
+    // Status table.
     const statusRow = startRow + points.length * 2 + 2;
 
     sheet.mergeCells(`B${statusRow}:E${statusRow}`);
-    sheet.getCell(`B${statusRow}`).value = "■ 현황";
+    sheet.getCell(`B${statusRow}`).value = "종합 현황";
     sheet.getCell(`B${statusRow}`).font = { size: 11, name: "맑은 고딕", bold: true, color: { argb: COLORS.navy } };
     sheet.getCell(`B${statusRow}`).fill = fill("D9E2F3");
     sheet.getCell(`B${statusRow}`).alignment = { horizontal: "left", vertical: "middle" };
@@ -820,7 +878,6 @@
       sheet.getRow(r).height = 24;
     });
 
-    // 총합Point 행
     const totalPointRow = statusRow + 8;
     setRangeRow(sheet, totalPointRow, 2, ["총합Point", "", "", ""], `B${totalPointRow}:E${totalPointRow}`, { fill: "F5F6F8" });
     sheet.getCell(`B${totalPointRow}`).font = { bold: true, name: "맑은 고딕" };
@@ -831,15 +888,13 @@
     sheet.getCell(`C${totalPointRow}`).numFmt = "#,##0\" P\"";
     sheet.getRow(totalPointRow).height = 26;
 
-    // 전체 현황 테이블 외곽 스타일
     styleRange(sheet, `B${statusRow + 1}:E${totalPointRow}`, {
       alignment: { horizontal: "center", vertical: "middle", wrapText: true },
       borderColor: COLORS.border,
     });
 
-    // ── 실 개통 Point 테이블 ───────────────────────────────────
     sheet.mergeCells(`G${statusRow}:J${statusRow}`);
-    sheet.getCell(`G${statusRow}`).value = "■ 실 개통 Point";
+    sheet.getCell(`G${statusRow}`).value = "순개통 Point";
     sheet.getCell(`G${statusRow}`).font = { size: 11, name: "맑은 고딕", bold: true, color: { argb: COLORS.navy } };
     sheet.getCell(`G${statusRow}`).fill = fill("D9E2F3");
     sheet.getCell(`G${statusRow}`).alignment = { horizontal: "left", vertical: "middle" };
@@ -868,7 +923,6 @@
     sheet.getCell(`G${statusRow + 3}`).font = { bold: true, name: "맑은 고딕" };
     for (let c = 8; c <= 10; c++) sheet.getCell(statusRow + 3, c).numFmt = "#,##0\" P\"";
 
-    // 총합Point
     setRangeRow(sheet, statusRow + 4, 7, ["총합Point", "", "", ""], `G${statusRow + 4}:J${statusRow + 4}`, { fill: "F5F6F8" });
     sheet.getCell(`G${statusRow + 4}`).fill = fill("E7E6E6");
     sheet.getCell(`G${statusRow + 4}`).font = { bold: true, name: "맑은 고딕" };
@@ -884,7 +938,6 @@
     });
     [statusRow + 2, statusRow + 3].forEach(r => { sheet.getRow(r).height = 24; });
 
-    // 폰트 일괄 적용
     sheet.eachRow(row => {
       row.eachCell({ includeEmpty: true }, cell => {
         cell.font = { ...cell.font, name: "맑은 고딕" };
@@ -907,16 +960,15 @@
       },
     });
 
-    // A(공백) B(구분) C~H(데이터6열) I(공백) J~M(가중치)
+    // A blank, B label, C~H data, I blank, J~M weighted guide.
     [2, 16, 13, 13, 13, 13, 13, 13, 3, 22, 13, 13, 13].forEach((width, index) => {
       sheet.getColumn(index + 1).width = width;
     });
 
     const muTarget = number(summary?.mu_target_count) || number(settings?.mu_target_count) || 600;
 
-    // ── 제목 / 소제목 ──────────────────────────────────────────
     sheet.mergeCells("B2:H2");
-    sheet.getCell("B2").value = "3. 도매 온라인M(U) 목표달성 프로그램";
+    sheet.getCell("B2").value = "3. 모바일 단말/유심(U) 목표달성 프로그램";
     sheet.getCell("B2").font = { size: 12, name: "맑은 고딕", bold: true };
     sheet.getRow(2).height = 22;
 
@@ -925,22 +977,21 @@
     sheet.getCell("B3").font = { size: 10, name: "맑은 고딕", color: { argb: "595959" } };
     sheet.getRow(3).height = 18;
 
-    // ── 섹션 타이틀: 정책 그레이드 구간 ───────────────────────
     sheet.mergeCells("B5:H5");
-    sheet.getCell("B5").value = "■ 정책 그레이드 구간";
+    sheet.getCell("B5").value = "정책 그레이드 구간";
     sheet.getCell("B5").font = { size: 11, name: "맑은 고딕", bold: true, color: { argb: COLORS.navy } };
     sheet.getCell("B5").fill = fill("D9E2F3");
     sheet.getCell("B5").alignment = { horizontal: "left", vertical: "middle" };
     sheet.getRow(5).height = 24;
 
-    // ── 데이터 미리 계산 (구간 달성치 확인용) ─────────────────────────
+    // Pre-calculate status values.
     const mOpen = number(monthlySummary.open_mobile_device);
     const uOpen = number(monthlySummary.open_mobile_usim);
     const mInstall = number(monthlySummary.install_mobile_device);
     const uInstall = number(monthlySummary.install_mobile_usim);
 
-    const uRate = normalizedRate(settings?.usim_open_rate, summary.usim_open_rate_setting, 50);
-    const mRate = normalizedRate(settings?.device_open_rate, summary.device_open_rate_setting, 50);
+    const uRate = summary.report_closed ? 0 : normalizedRate(settings?.usim_open_rate, summary.usim_open_rate_setting, 50);
+    const mRate = summary.report_closed ? 0 : normalizedRate(settings?.device_open_rate, summary.device_open_rate_setting, 50);
 
     const mExpected = Math.floor(mInstall * mRate);
     const uExpected = Math.floor(uInstall * uRate);
@@ -950,7 +1001,7 @@
     const combinedTotal = mTotal + uTotal;
     const actualMuOpen = mOpen + uOpen;
 
-    // ── 그레이드 구간 데이터 (6열씩) ───────────────────────────
+    // Grade tiers, six items per row.
     let muTiersList = [];
     try {
       if (settings && settings.mu_tiers) {
@@ -993,7 +1044,7 @@
           sheet.getCell(`${col}${r1}`).value = `${p.count.toLocaleString()} 건`;
           sheet.getCell(`${col}${r2}`).value = `${p.payment.toLocaleString()} 만원`;
 
-          // 달성한 목표에 색상 부여
+          // Highlight achieved tiers.
           if (actualMuOpen >= p.count) {
             sheet.getCell(`${col}${r1}`).fill = fill("FFE699");
             sheet.getCell(`${col}${r2}`).fill = fill("FFF2CC");
@@ -1007,7 +1058,7 @@
       sheet.getRow(r2).height = 28;
     });
 
-    // ── M/U 비중 / 가중치 행 ──────────────────────────────────
+    // M/U ratio weight guide.
     const rRatio1 = startRow + muRanges.length * 2;
     const rRatio2 = rRatio1 + 1;
 
@@ -1024,7 +1075,7 @@
     [20, 25, 30, 35, 40].forEach((p, idx) => {
       const col = String.fromCharCode(67 + idx); // C..G
       sheet.getCell(`${col}${rRatio1}`).value = `${p}%`;
-      sheet.getCell(`${col}${rRatio2}`).value = `지급금액x${ratioWeights[idx]}%`;
+      sheet.getCell(`${col}${rRatio2}`).value = `지급금액 x ${ratioWeights[idx]}%`;
     });
 
     sheet.mergeCells(`H${rRatio1}:H${rRatio2}`);
@@ -1039,11 +1090,11 @@
     sheet.getRow(rRatio1).height = 28;
     sheet.getRow(rRatio2).height = 24;
 
-    // ── 현황 테이블 ────────────────────────────────────────────
+    // Status table.
     const statusRow = rRatio2 + 2;
 
     sheet.mergeCells(`B${statusRow}:D${statusRow}`);
-    sheet.getCell(`B${statusRow}`).value = "■ 현황";
+    sheet.getCell(`B${statusRow}`).value = "종합 현황";
     sheet.getCell(`B${statusRow}`).font = { size: 11, name: "맑은 고딕", bold: true, color: { argb: COLORS.navy } };
     sheet.getCell(`B${statusRow}`).fill = fill("D9E2F3");
     sheet.getCell(`B${statusRow}`).alignment = { horizontal: "left", vertical: "middle" };
@@ -1052,7 +1103,6 @@
     const mDiff = comparison?.current && comparison?.previous ? mOpen - number(comparison.previous.open_mobile_device) : 0;
     const uDiff = comparison?.current && comparison?.previous ? uOpen - number(comparison.previous.open_mobile_usim) : 0;
 
-    // 헤더
     setRangeRow(sheet, statusRow + 1, 2,
       ["구분", "U", "M"],
       `B${statusRow + 1}:D${statusRow + 1}`,
@@ -1090,7 +1140,6 @@
       sheet.getRow(r).height = 26;
     });
 
-    // 일일 평균 개통 행
     const bDays = number(comparison?.remainingBusinessDays) || 1;
     const totalOpen = mOpen + uOpen;
     const pDays = number(summary.passed_business_days) || 13;
@@ -1098,7 +1147,7 @@
     const avgRow = statusRow + 8;
 
     sheet.mergeCells(`B${avgRow}:D${avgRow}`);
-    sheet.getCell(`B${avgRow}`).value = `일일 평균 개통 ${dailyAvg} 건 (${totalOpen}/${pDays}일)`;
+    sheet.getCell(`B${avgRow}`).value = `일 평균 개통 ${dailyAvg} 건 (${totalOpen}/${pDays}일)`;
     sheet.getCell(`B${avgRow}`).font = { name: "맑은 고딕", size: 10, color: { argb: "595959" } };
     sheet.getCell(`B${avgRow}`).fill = fill("F5F6F8");
     sheet.getCell(`B${avgRow}`).alignment = { horizontal: "center", vertical: "middle" };
@@ -1109,13 +1158,13 @@
       borderColor: COLORS.border,
     });
 
-    // ── 가중치 안내 섹션 (우측) ────────────────────────────────
+    // Weight guide.
     const compRateStr = monthlySummary.expected_internet > 0
       ? Math.floor((number(monthlySummary.main_dongpan_usim) / monthlySummary.expected_internet) * 100)
       : 0;
 
     sheet.mergeCells(`F${statusRow}:I${statusRow}`);
-    sheet.getCell(`F${statusRow}`).value = `■ 인터넷 대비 M/U 비율 : ${compRateStr}% 예상`;
+    sheet.getCell(`F${statusRow}`).value = `인터넷 대비 M/U 비율 : ${compRateStr}% 예상`;
     sheet.getCell(`F${statusRow}`).font = { size: 11, name: "맑은 고딕", bold: true, color: { argb: COLORS.navy } };
     sheet.getCell(`F${statusRow}`).fill = fill("D9E2F3");
     sheet.getCell(`F${statusRow}`).alignment = { horizontal: "left", vertical: "middle" };
@@ -1128,11 +1177,11 @@
     sheet.getRow(statusRow + 1).height = 24;
 
     const weights2 = [
-      "20% : 지급금액 X 105%",
-      "25% : 지급금액 X 108%",
-      "30% : 지급금액 X 110%",
-      "35% : 지급금액 X 113%",
-      "40% : 지급금액 X 115%",
+      "20% : 지급금액 x 105%",
+      "25% : 지급금액 x 108%",
+      "30% : 지급금액 x 110%",
+      "35% : 지급금액 x 113%",
+      "40% : 지급금액 x 115%",
     ];
 
     weights2.forEach((w, idx) => {
@@ -1146,16 +1195,20 @@
       sheet.getRow(wr).height = 26;
     });
 
-    // 목표까지 필요 계산 강조 행
-    const remaining = Math.max(muTarget - combinedTotal, 0);
-    const neededRatio = uRate > 0 ? (1 / uRate) : 2;
-    const neededStr = uRate > 0 ? Math.round(uRate * 100) : 50;
-    const totalNeeded = Math.round(remaining * neededRatio);
-    const dailyNeeded = Math.floor(totalNeeded / bDays);
+    const neededStr = Math.round(uRate * 100);
+    const adjustedTarget = uRate > 0 ? Math.ceil(muTarget / uRate) : muTarget;
+    const rawRemaining = adjustedTarget - combinedTotal;
+    const remaining = Math.max(rawRemaining, 0);
+    const dailyNeeded = Math.floor(remaining / bDays);
+    const targetLabel = uRate > 0
+      ? `${muTarget.toLocaleString()} / 개통율 ${neededStr}%`
+      : `${muTarget.toLocaleString()}`;
 
     const needRow1 = statusRow + 7;
     sheet.mergeCells(`F${needRow1}:I${needRow1}`);
-    sheet.getCell(`F${needRow1}`).value = `${muTarget.toLocaleString()} - ${combinedTotal.toLocaleString()} = ${remaining.toLocaleString()} 개통율 ${neededStr}% = ${totalNeeded.toLocaleString()} 건필요`;
+    sheet.getCell(`F${needRow1}`).value = remaining > 0
+      ? `${targetLabel} - ${combinedTotal.toLocaleString()} = ${remaining.toLocaleString()} 건 필요`
+      : `${targetLabel} - ${combinedTotal.toLocaleString()} = ${remaining.toLocaleString()} 목표 달성 완료`;
     sheet.getCell(`F${needRow1}`).font = { color: { argb: "C00000" }, bold: true, name: "맑은 고딕", size: 10 };
     sheet.getCell(`F${needRow1}`).fill = fill("FFF2CC");
     sheet.getCell(`F${needRow1}`).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
@@ -1164,14 +1217,15 @@
 
     const needRow2 = statusRow + 8;
     sheet.mergeCells(`F${needRow2}:I${needRow2}`);
-    sheet.getCell(`F${needRow2}`).value = `${totalNeeded.toLocaleString()} / ${bDays} = 일 ${dailyNeeded.toLocaleString()} 건 필요`;
+    sheet.getCell(`F${needRow2}`).value = remaining > 0
+      ? `${remaining.toLocaleString()} / ${bDays} = 일 ${dailyNeeded.toLocaleString()} 건 필요`
+      : "추가 필요 건수 없음";
     sheet.getCell(`F${needRow2}`).font = { color: { argb: "C00000" }, bold: true, name: "맑은 고딕", size: 10 };
     sheet.getCell(`F${needRow2}`).fill = fill("FFF2CC");
     sheet.getCell(`F${needRow2}`).alignment = { horizontal: "center", vertical: "middle" };
     sheet.getCell(`F${needRow2}`).border = border("FFC000");
     sheet.getRow(needRow2).height = 26;
 
-    // 폰트 일괄 적용
     sheet.eachRow(row => {
       row.eachCell({ includeEmpty: true }, cell => {
         cell.font = { ...cell.font, name: "맑은 고딕" };
@@ -1195,7 +1249,7 @@
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function download({ summary, rows, selectedDate, reportMonth, settings }) {
+  async function download({ summary, rows, selectedDate, cutoffDate, reportMonth, settings }) {
     if (!window.ExcelJS) {
       throw new Error("엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.");
     }
@@ -1203,19 +1257,21 @@
     workbook.creator = "KT Grade Report";
     workbook.created = new Date();
     workbook.modified = new Date();
-    const comparison = createDailyComparison(rows, summary || {}, selectedDate, settings);
-    comparison.dateRangeLabel = buildDateRangeLabel(selectedDate, reportMonth);
+    const effectiveCutoff = cutoffDate || getReportCutoffDate(selectedDate, reportMonth);
+    const comparison = createDailyComparison(rows, summary || {}, selectedDate, settings, effectiveCutoff, reportMonth);
+    comparison.dateRangeLabel = buildDateRangeLabel(selectedDate, reportMonth, effectiveCutoff);
     const reportSummary = comparison.current ? { ...comparison.current } : { ...(summary || {}) };
     if (summary) {
       [
         "target_count", "online_target_count", "mu_target_count", "target_point",
         "internet_open_rate_setting", "tv_open_rate_setting",
-        "usim_open_rate_setting", "device_open_rate_setting", "partner_data"
+        "usim_open_rate_setting", "device_open_rate_setting", "partner_data",
+        "report_month", "report_closed"
       ].forEach(k => {
         if (summary[k] !== undefined) reportSummary[k] = summary[k];
       });
     }
-    const monthlySummary = computeMonthlySummary(rows, selectedDate, reportSummary, settings);
+    const monthlySummary = computeMonthlySummary(rows, selectedDate, reportSummary, settings, reportMonth, effectiveCutoff);
     createReportSheet(workbook, reportSummary, selectedDate, reportMonth, comparison, monthlySummary);
     createTargetPointSheet(workbook, reportSummary, monthlySummary, settings);
     createMobileTargetSheet(workbook, reportSummary, monthlySummary, comparison, settings);

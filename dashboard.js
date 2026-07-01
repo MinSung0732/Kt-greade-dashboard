@@ -1,4 +1,4 @@
-function updateMatrixTotals() {
+﻿function updateMatrixTotals() {
   const getVal = (id) => parseInt(document.getElementById(id)?.value || '0', 10);
   const setVal = (id, val) => {
     const el = document.getElementById(id);
@@ -17,7 +17,17 @@ function updateMatrixTotals() {
 }
 function readForm() {
   const raw = Object.fromEntries(fieldIds.map((id) => [id, getInputValue(id)]));
-  
+  // The typed "date" is the morning it was entered; the figures describe the
+  // day before it. getSelectedMonthLabel() uses the reportMonth picker when
+  // present (index.html), or falls back to that effective date's month when
+  // it isn't (input.html, which has no picker to forget to switch).
+  const reportMonth = getSelectedMonthLabel();
+  const deadlineDate = raw.deadlineDate || getDeadlineForMonth(reportMonth);
+  // Closed when the typed date has rolled into a month after the one being
+  // reported - e.g. typing on 7/1 to finalize June (reportMonth "2026-06")
+  // is closed, but typing on 7/1 while viewing July itself is not.
+  const reportClosed = isReportMonthClosed(raw.date, reportMonth);
+
   // Find partner data for the current date in localStorage
   let partnerData = {};
   try {
@@ -63,7 +73,9 @@ function readForm() {
     online_target_count: toNumber(raw.onlineTargetCount || currentSettings.online_target_count),
     mu_target_count: toNumber(raw.muTargetCount || currentSettings.mu_target_count),
     target_point: toNumber(raw.targetPoint || currentSettings.target_point),
-    deadline_date: raw.deadlineDate || currentSettings.deadline_date,
+    deadline_date: deadlineDate,
+    report_month: reportMonth,
+    report_closed: reportClosed,
     partner_data: JSON.stringify(partnerData)
   };
 
@@ -80,7 +92,7 @@ function renderDashboard(row, previousRow = null) {
   setText("#expectedWholesaleInternetView", formatNumber(row.expected_wholesale_internet));
   setText("#expectedInternetView", formatNumber(row.expected_internet));
   
-  // 요소가 있을 경우(웹 대시보드용) 텍스트 업데이트
+  // Update expected internet breakdown text when the helper exists.
   const breakdownEl = document.querySelector("#expectedInternetBreakdown");
   if (breakdownEl) {
     breakdownEl.textContent = `(온라인 ${formatNumber(row.expected_online_internet)} + 도매 ${formatNumber(row.expected_wholesale_internet)})`;
@@ -174,7 +186,7 @@ function renderDashboard(row, previousRow = null) {
   if (gaugeFillCircle) {
     const radius = 54;
     const circumference = 2 * Math.PI * radius;
-    const rate = Math.min(row.open_rate || 0, 1.0); // 최대 100%까지 채움
+    const rate = Math.min(row.open_rate || 0, 1.0);
     const offset = circumference - (rate * circumference);
     gaugeFillCircle.style.strokeDashoffset = offset;
   }
@@ -201,11 +213,11 @@ function renderDashboard(row, previousRow = null) {
 }
 
 function renderGoalDashCards(row) {
-  // goal.js의 구간 데이터를 활용 (공유)
+  // Use shared goal tiers from goal.js.
   const ktGoal = window.KTGoal;
   if (!ktGoal) return;
 
-  // ① TV + M/U 합산 Point (개통완료 기준)
+  // TV + M/U total point based on completed openings.
   const tvPoint = toNumber(row.open_main_tv) * 2 + toNumber(row.open_extra_device) * 1;
   const muPoint = (toNumber(row.open_mobile_device) + toNumber(row.open_mobile_usim)) * 2;
   const tvmuPoint = tvPoint + muPoint;
@@ -225,12 +237,12 @@ function renderGoalDashCards(row) {
     const gap = nextTvmuTier.point - tvmuPoint;
     setText("#dashTvmuNextView", `${Math.ceil(gap).toLocaleString("ko-KR")} P 남음`);
   } else if (tvmuTier) {
-    setText("#dashTvmuNextView", "최고 구간 달성 🎉");
+    setText("#dashTvmuNextView", "최고 구간 달성 완료");
   } else {
     setText("#dashTvmuNextView", "-");
   }
 
-  // ② M/U 건수 (개통완료 기준)
+  // M/U count based on completed openings.
   const muCount = toNumber(row.open_mobile_device) + toNumber(row.open_mobile_usim);
   const muTier = ktGoal.getCurrentMuTier(muCount);
   const nextMuTier = ktGoal.getNextMuTier(muCount);
@@ -247,12 +259,12 @@ function renderGoalDashCards(row) {
     const gap = nextMuTier.count - muCount;
     setText("#dashMuNextView", `${Math.ceil(gap).toLocaleString("ko-KR")} 건 남음`);
   } else if (muTier) {
-    setText("#dashMuNextView", "최고 구간 달성 🎉");
+    setText("#dashMuNextView", "최고 구간 달성 완료");
   } else {
     setText("#dashMuNextView", "-");
   }
 
-  // 카드 강조 클래스 (달성 여부)
+  // Highlight achieved goal cards.
   toggleGoalCardState("#dashboard-tvmu", tvmuTier);
   toggleGoalCardState("#dashboard-mu", muTier);
 }
@@ -291,7 +303,7 @@ function getDashboardSummary() {
 
 function summarizeMonthlyRows(rows, currentRow, selectedMonth) {
   const monthKey = selectedMonth || getMonthKey(currentRow.date);
-  const monthRows = rows.filter((row) => getMonthKey(row.date) === monthKey);
+  const monthRows = rows.filter((row) => rowBelongsToReportMonth(row, monthKey));
   
   if (monthRows.length === 0) {
     const summary = createEmptySummary(currentRow, monthKey);
@@ -299,10 +311,22 @@ function summarizeMonthlyRows(rows, currentRow, selectedMonth) {
     return summary;
   }
 
-  const latestRow = monthRows
+  const sortedRows = monthRows
     .slice()
-    .sort((a, b) => new Date(`${a.date}T00:00:00`) - new Date(`${b.date}T00:00:00`))
-    [monthRows.length - 1];
+    .sort((a, b) => getReportSortDate(a).localeCompare(getReportSortDate(b)));
+
+  const cutoffDate = currentRow?.date ? getEffectiveDate(currentRow.date) : "";
+  const eligibleRows = cutoffDate
+    ? sortedRows.filter((row) => getReportSortDate(row) <= cutoffDate)
+    : sortedRows;
+
+  if (eligibleRows.length === 0) {
+    const summary = createEmptySummary(currentRow, monthKey);
+    finalizeSummary(summary, currentRow);
+    return summary;
+  }
+
+  const latestRow = eligibleRows[eligibleRows.length - 1];
   const summary = { ...latestRow };
 
   summary.date = monthKey ? `${monthKey} 월 누적` : "-";
@@ -376,8 +400,10 @@ function finalizeSummary(summary, currentRow) {
   summary.mu_target_count = currentRow.mu_target_count;
   summary.target_point = currentRow.target_point;
   summary.deadline_date = currentRow.deadline_date;
+  summary.report_month = currentRow.report_month;
+  summary.report_closed = currentRow.report_closed;
   
-  // 개통율 설정도 최신(currentRow) 값으로 덮어씌워야 함
+  // Keep current form settings authoritative for the summary.
   summary.internet_open_rate_setting = currentRow.internet_open_rate_setting;
   summary.tv_open_rate_setting = currentRow.tv_open_rate_setting;
   summary.usim_open_rate_setting = currentRow.usim_open_rate_setting;
@@ -461,6 +487,8 @@ function normalizeRows(rows) {
       const hasOnlineTarget = normalized.online_target_count !== undefined && normalized.online_target_count !== "";
       normalized.date = toDateInputText(normalized.date) || String(normalized.date).slice(0, 10);
       normalized.deadline_date = toDateInputText(normalized.deadline_date);
+      normalized.report_month = String(normalized.report_month || "").slice(0, 7);
+      normalized.report_closed = normalized.report_closed === true || String(normalized.report_closed).toLowerCase() === "true";
 
       const numericKeys = [
         "open_online_internet", "open_wholesale_internet",
@@ -547,6 +575,7 @@ function getCurrentRateSet() {
 
 function computeRowMetrics(raw) {
   const row = { ...raw };
+  const closedReport = Boolean(row.report_closed);
 
   // Fallback for TV
   if (row.open_online_tv > 0 && row.open_online_main_tv + row.open_online_extra === 0) {
@@ -586,10 +615,16 @@ function computeRowMetrics(raw) {
   row.mobile_total = row.open_mobile_total + row.install_mobile_total;
 
   // Expected
-  const intRate = row.internet_open_rate_setting !== undefined ? toRate(row.internet_open_rate_setting) : toRate(currentSettings.internet_open_rate);
-  const tvRate = row.tv_open_rate_setting !== undefined ? toRate(row.tv_open_rate_setting) : toRate(currentSettings.tv_open_rate);
-  const usimRate = row.usim_open_rate_setting !== undefined ? toRate(row.usim_open_rate_setting) : toRate(currentSettings.usim_open_rate);
-  const devRate = row.device_open_rate_setting !== undefined ? toRate(row.device_open_rate_setting) : toRate(currentSettings.device_open_rate);
+  const intRate = closedReport ? 0 : (row.internet_open_rate_setting !== undefined ? toRate(row.internet_open_rate_setting) : toRate(currentSettings.internet_open_rate));
+  const tvRate = closedReport ? 0 : (row.tv_open_rate_setting !== undefined ? toRate(row.tv_open_rate_setting) : toRate(currentSettings.tv_open_rate));
+  const usimRate = closedReport ? 0 : (row.usim_open_rate_setting !== undefined ? toRate(row.usim_open_rate_setting) : toRate(currentSettings.usim_open_rate));
+  const devRate = closedReport ? 0 : (row.device_open_rate_setting !== undefined ? toRate(row.device_open_rate_setting) : toRate(currentSettings.device_open_rate));
+  if (closedReport) {
+    row.internet_open_rate_setting = 0;
+    row.tv_open_rate_setting = 0;
+    row.usim_open_rate_setting = 0;
+    row.device_open_rate_setting = 0;
+  }
 
   row.expected_online_internet = row.open_online_internet + expectedByRate(row.install_online_internet, intRate);
   row.expected_wholesale_internet = row.open_wholesale_internet + expectedByRate(row.install_wholesale_internet, intRate);
@@ -611,8 +646,13 @@ function computeRowMetrics(raw) {
   row.expected_mobile_total = row.expected_mobile_usim + row.expected_mobile_device;
 
   // KPIs
-  row.remaining_business_days = countBusinessDays(row.date, row.deadline_date);
-  row.passed_business_days = countPassedBusinessDays(row.date);
+  row.remaining_business_days = closedReport ? 0 : countBusinessDays(row.date, row.deadline_date);
+  row.passed_business_days = closedReport
+    ? countBusinessDays(
+        `${row.report_month || getMonthKey(row.date)}-01`,
+        getMonthEndDate(row.report_month || getMonthKey(row.date)),
+      )
+    : countPassedBusinessDays(row.date);
   row.remaining_count = Math.max(row.target_count - row.expected_internet, 0);
   row.open_rate = row.target_count > 0 ? row.expected_internet / row.target_count : 0;
   const requiredInternetInstallations = intRate > 0 ? row.remaining_count / intRate : row.remaining_count;

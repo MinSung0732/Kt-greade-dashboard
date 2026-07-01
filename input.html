@@ -49,12 +49,22 @@
               </label>
               <label>
                 마감일
-                <input type="date" id="deadlineDate" />
+                <input type="date" id="deadlineDate" title="월별 접수마감일" />
+                <small class="field-hint" id="deadlineMonthTarget">보고 월별로 저장됩니다</small>
               </label>
               <div class="business-day-box">
                 <span>남은 영업일수</span>
                 <strong id="remainingBusinessDaysView">0일</strong>
               </div>
+            </div>
+            <div class="deadline-manager" id="deadlineManager">
+              <button type="button" id="toggleDeadlineManagerBtn" class="link-btn">월별 마감일 목록 보기/수정</button>
+              <div class="deadline-manager-add" id="deadlineManagerAdd" hidden>
+                <input type="month" id="addDeadlineMonth" title="대상 월" />
+                <input type="date" id="addDeadlineDate" title="마감일" />
+                <button type="button" id="addDeadlineBtn">추가</button>
+              </div>
+              <ul class="deadline-manager-list" id="deadlineManagerList" hidden></ul>
             </div>
           </div>
 
@@ -201,7 +211,7 @@
                 <input type="number" min="0" step="1" id="openMobileUsim" value="0" />
               </label>
               <label>
-                메인개통(동판/단판)
+                메인동반유심
                 <input type="number" min="0" step="1" id="mainDongpanUsim" value="0" />
               </label>
             </div>
@@ -209,7 +219,7 @@
 
           <div class="entry-block">
             <div class="entry-title">
-              <h3>가설중</h3>
+              <h3>가설 접수</h3>
               <span>접수 후 개통 대기</span>
             </div>
             <div class="matrix-wrap">
@@ -284,13 +294,13 @@
             </svg>
             <div class="gauge-value-box">
               <span class="percent" id="gaugePercentText">0%</span>
-              <span class="label">인터넷 달성률</span>
+              <span class="label">인터넷 목표달성률</span>
             </div>
           </div>
 
           <div class="progress-block">
             <div class="progress-copy">
-              <span>모바일 목표 달성률 <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
+              <span>모바일 목표 달성률<span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
               <strong id="mobileProgressText">0%</strong>
             </div>
             <div class="progress-track">
@@ -304,11 +314,11 @@
               <dd id="completedInternetSplitView">0 / 0</dd>
             </div>
             <div>
-              <dt>총 인터넷 개통완료</dt>
+              <dt>총 인터넷 개통예상</dt>
               <dd id="expectedInternetDetailView">0</dd>
             </div>
             <div>
-              <dt>인터넷 목표량</dt>
+              <dt>인터넷 목표수</dt>
               <dd id="internetTargetView">0</dd>
             </div>
             <div>
@@ -328,11 +338,11 @@
               <dd id="openMobileSplitView">0 / 0</dd>
             </div>
             <div>
-              <dt>총 모바일 개통완료</dt>
+              <dt>총 모바일 개통예상</dt>
               <dd id="expectedMobileDetailView">0</dd>
             </div>
             <div>
-              <dt>모바일 목표량</dt>
+              <dt>모바일 목표수</dt>
               <dd id="mobileTargetView">0</dd>
             </div>
             <div>
@@ -344,10 +354,10 @@
 
         <aside class="sidebar-panel">
           <div class="excel-upload-zone" id="excelUploadZone">
-            <div class="icon">📊</div>
-            <p><strong>엑셀 파일(인터넷/TV/유심/기기)</strong>을 드래그 앤 드롭 하거나 클릭하여 업로드</p>
+            <div class="icon">📁</div>
+            <p><strong>엑셀 파일(인터넷/TV/유심/기기)</strong>을 드래그하여 놓거나 클릭하여 업로드</p>
             <div style="font-size: 12.5px; color: var(--color-gray-500); margin-top: 8px; line-height: 1.5;">
-              파일 이름에 아래 단어가 포함되어야 해당 항목으로 <strong>자동 분류</strong>됩니다.<br/>
+              파일 이름에 아래 단어가 포함되어야 해당 항목으로 <strong>자동 분류</strong>합니다.<br/>
               <strong style="color: var(--color-gray-700);">개통완료:</strong> 인터넷_개통완료, TV_개통완료, 유심_개통완료, 기기_개통완료<br/>
               <strong style="color: var(--color-gray-700);">가설중:</strong> 인터넷_가설중, TV_가설중, 유심_가설중, 기기_가설중
             </div>
@@ -396,14 +406,14 @@
             <div>
               <div class="modal-section-title">
                 <span>TV + M/U 합산 목표 구간</span>
-                <button type="button" id="addTvmuTierBtn">행 추가</button>
+                <button type="button" id="addTvmuTierBtn">+ 추가</button>
               </div>
               <div style="max-height:200px; overflow-y:auto; border:1px solid var(--line);">
                 <table class="modal-table">
                   <thead>
                     <tr>
                       <th>Point</th>
-                      <th>지급금액 (만원)</th>
+                      <th>지급금액(만원)</th>
                       <th style="width:50px;">삭제</th>
                     </tr>
                   </thead>
@@ -414,14 +424,14 @@
             <div>
               <div class="modal-section-title">
                 <span>도매 온라인 M/U 목표 구간</span>
-                <button type="button" id="addMuTierBtn">행 추가</button>
+                <button type="button" id="addMuTierBtn">+ 추가</button>
               </div>
               <div style="max-height:200px; overflow-y:auto; border:1px solid var(--line);">
                 <table class="modal-table">
                   <thead>
                     <tr>
                       <th>건수</th>
-                      <th>지급금액 (만원)</th>
+                      <th>지급금액(만원)</th>
                       <th style="width:50px;">삭제</th>
                     </tr>
                   </thead>
@@ -440,13 +450,13 @@
     </main>
 
     <script src="config.js?v=1782309894630"></script>
-    <script src="utils.js?v=1782700200000"></script>
-    <script src="api.js?v=1782700200000"></script>
-    <script src="dom.js?v=1782700200000"></script>
+    <script src="utils.js?v=1782900000001"></script>
+    <script src="api.js?v=1782879000000"></script>
+    <script src="dom.js?v=1782900000001"></script>
     <script src="excel.js?v=1782700200001"></script>
-    <script src="chart.js?v=1782309894630"></script>
+    <script src="chart.js?v=1782900000001"></script>
     <script src="goal.js?v=1782309894630"></script>
-    <script src="dashboard.js?v=1782700200000"></script>
-    <script src="app.js?v=1782700200000"></script>
+    <script src="dashboard.js?v=1782900000001"></script>
+    <script src="app.js?v=1782900000001"></script>
   </body>
 </html>

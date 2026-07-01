@@ -79,6 +79,8 @@ const HEADERS = [
   'daily_mobile_device',
   'daily_mobile_usim',
   'partner_data',
+  'report_month',
+  'report_closed',
 ];
 
 function doGet(e) {
@@ -166,13 +168,43 @@ function getRows(month) {
     .map((values) => {
       const row = {};
       HEADERS.forEach((header, index) => {
-        row[header] = header === 'date' ? normalizeDate(values[index]) : values[index];
+        if (header === 'date') {
+          row[header] = normalizeDate(values[index]);
+        } else if (header === 'report_month') {
+          row[header] = normalizeReportMonth(values[index]);
+        } else {
+          row[header] = values[index];
+        }
       });
       return row;
     })
     .filter((row) => row.date)
-    .filter((row) => !month || String(row.date).slice(0, 7) === month)
+    .filter((row) => !month || rowBelongsToReportMonth(row, month))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+function rowBelongsToReportMonth(row, month) {
+  if (!month) return true;
+  const reportMonth = normalizeReportMonth(row.report_month);
+  if (reportMonth) return reportMonth === month;
+  return String(getEffectiveDate(row.date)).slice(0, 7) === month;
+}
+
+// Every row's "date" is the day it was typed in (the following morning);
+// the figures it holds are the cumulative totals as of the day before.
+function getEffectiveDate(dateText) {
+  const normalized = normalizeDate(dateText);
+  if (!normalized) return '';
+  const parts = normalized.split('-').map(Number);
+  const date = new Date(parts[0], parts[1] - 1, parts[2] - 1);
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+function getNextMonthFirstDate(month) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return '';
+  const parts = month.split('-').map(Number);
+  const date = new Date(parts[0], parts[1], 1);
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
 function getSheet() {
@@ -210,6 +242,7 @@ function getSettings() {
     updated_at: sheet.getRange('B8').getValue(),
     tvmu_tiers: sheet.getRange('B11').getValue() || '',
     mu_tiers: sheet.getRange('B12').getValue() || '',
+    monthly_deadlines: sheet.getRange('B13').getValue() || '{}',
   };
 }
 
@@ -228,9 +261,10 @@ function saveSettings(settings) {
     updated_at: settings.updated_at || new Date().toISOString(),
     tvmu_tiers: settings.tvmu_tiers || '',
     mu_tiers: settings.mu_tiers || '',
+    monthly_deadlines: normalizeMonthlyDeadlines(settings.monthly_deadlines),
   };
 
-  sheet.getRange('A1:B12').setValues([
+  sheet.getRange('A1:B13').setValues([
     ['target_count', values.target_count],
     ['target_point', values.target_point],
     ['deadline_date', values.deadline_date],
@@ -243,6 +277,7 @@ function saveSettings(settings) {
     ['mu_target_count', values.mu_target_count],
     ['tvmu_tiers', values.tvmu_tiers],
     ['mu_tiers', values.mu_tiers],
+    ['monthly_deadlines', values.monthly_deadlines],
   ]);
 
   return values;
@@ -269,6 +304,7 @@ function getSettingsSheet() {
     ['mu_target_count', 600],
     ['tvmu_tiers', ''],
     ['mu_tiers', ''],
+    ['monthly_deadlines', '{}'],
   ];
   const lastRow = Math.max(sheet.getLastRow(), defaults.length);
   const current = sheet.getRange(1, 1, lastRow, 2).getValues();
@@ -280,9 +316,21 @@ function getSettingsSheet() {
     row[0],
     currentByKey[row[0]] !== undefined && currentByKey[row[0]] !== '' ? currentByKey[row[0]] : row[1],
   ]);
-  sheet.getRange('A1:B12').setValues(next);
+  sheet.getRange(1, 1, defaults.length, 2).setValues(next);
 
   return sheet;
+}
+
+function normalizeMonthlyDeadlines(value) {
+  if (!value) return '{}';
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+}
+
+function normalizeReportMonth(value) {
+  const dateText = normalizeDate(value);
+  const text = dateText ? dateText.slice(0, 7) : String(value || '').slice(0, 7);
+  return /^\d{4}-\d{2}$/.test(text) ? text : '';
 }
 
 function normalizeDate(value) {

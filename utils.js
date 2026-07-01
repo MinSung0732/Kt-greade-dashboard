@@ -1,4 +1,4 @@
-const STORAGE_KEYS = {
+﻿const STORAGE_KEYS = {
   localRows: "kt-dashboard-local-rows",
   cachedRows: "kt-dashboard-cached-rows",
   settings: "kt-dashboard-settings",
@@ -99,6 +99,15 @@ function getMonthKey(dateText) {
   return String(dateText || "").slice(0, 7);
 }
 
+// Every row's "date" is the day it was typed in (the following morning);
+// the figures it holds are the cumulative totals as of the day before.
+function getEffectiveDate(dateText) {
+  const date = parseDate(dateText);
+  if (!date) return "";
+  date.setDate(date.getDate() - 1);
+  return toDateInputValue(date);
+}
+
 function parseDate(value) {
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -108,6 +117,93 @@ function getDefaultDeadlineDate(date) {
   return toDateInputValue(new Date(date.getFullYear(), date.getMonth() + 1, 0));
 }
 
+function getMonthEndDate(monthKey) {
+  if (!/^\d{4}-\d{2}$/.test(String(monthKey || ""))) return "";
+  const [year, month] = monthKey.split("-").map(Number);
+  return toDateInputValue(new Date(year, month, 0));
+}
+
+function getNextMonthFirstDate(monthKey) {
+  if (!/^\d{4}-\d{2}$/.test(String(monthKey || ""))) return "";
+  const [year, month] = monthKey.split("-").map(Number);
+  return toDateInputValue(new Date(year, month, 1));
+}
+
+function getRowReportMonth(row) {
+  return String(row?.report_month || "").slice(0, 7) || "";
+}
+
+function rowBelongsToReportMonth(row, reportMonth) {
+  if (!reportMonth) return true;
+  const explicitReportMonth = getRowReportMonth(row);
+  if (explicitReportMonth) return explicitReportMonth === reportMonth;
+  return getMonthKey(getEffectiveDate(row?.date)) === reportMonth;
+}
+
+// Sort/compare key reflecting the day a row's figures actually describe
+// (the day before it was typed in), not the literal "date" field.
+function getReportSortDate(row) {
+  return getEffectiveDate(row?.date) || String(row?.date || "");
+}
+
+// Returns a raw "date field" value (not an effective date) marking the
+// cutoff to compare row.date against. For a month other than the one being
+// typed in, that's the following month's 1st - since a row's raw date is
+// always one day ahead of the day its figures describe, this is the raw
+// value a final entry for that month would carry.
+function getReportCutoffDate(selectedDate, reportMonth) {
+  const monthKey = reportMonth || getMonthKey(selectedDate);
+  if (!monthKey) return selectedDate || "";
+  if (!selectedDate) return getNextMonthFirstDate(monthKey);
+  return getMonthKey(selectedDate) === monthKey ? selectedDate : getNextMonthFirstDate(monthKey);
+}
+
+function isReportMonthClosed(selectedDate, reportMonth) {
+  const selectedMonth = getMonthKey(selectedDate);
+  return Boolean(selectedMonth && reportMonth && selectedMonth > reportMonth);
+}
+
+function parseMonthlyDeadlines(value) {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return { ...value };
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function getMonthlyDeadline(monthKey, settings = currentSettings) {
+  const deadlines = parseMonthlyDeadlines(settings.monthly_deadlines);
+  return toDateInputText(deadlines[monthKey]) || "";
+}
+
+function getDeadlineForMonth(monthKey, settings = currentSettings) {
+  return getMonthlyDeadline(monthKey, settings) || toDateInputText(settings.deadline_date) || getMonthEndDate(monthKey);
+}
+
+function setMonthlyDeadline(monthKey, deadlineDate, settings = currentSettings) {
+  const deadlines = parseMonthlyDeadlines(settings.monthly_deadlines);
+  if (monthKey && deadlineDate) deadlines[monthKey] = deadlineDate;
+  return deadlines;
+}
+
+function updateSelectedMonthDeadline(deadlineDate) {
+  const reportMonth = getSelectedMonthLabel();
+  if (!reportMonth || !deadlineDate) return currentSettings.monthly_deadlines || {};
+  const monthlyDeadlines = setMonthlyDeadline(reportMonth, deadlineDate);
+  currentSettings.monthly_deadlines = monthlyDeadlines;
+  currentSettings.deadline_date = deadlineDate;
+  return monthlyDeadlines;
+}
+
+function deleteMonthlyDeadline(monthKey, settings = currentSettings) {
+  const deadlines = parseMonthlyDeadlines(settings.monthly_deadlines);
+  delete deadlines[monthKey];
+  return deadlines;
+}
+
 // Could not find parseBusinessDays
 
 // Could not find getBusinessDaysInMonth
@@ -115,16 +211,16 @@ function getDefaultDeadlineDate(date) {
 // Could not find getBusinessDaysElapsed
 
 function formatBusinessDayStatus(row) {
-  const selectedMonth = getMonthKey(getInputValue("date"));
+  if (row.report_closed || row.remaining_business_days <= 0) return "영업마감";
+
+  const selectedMonth = getSelectedMonthLabel();
   const deadlineMonth = getMonthKey(row.deadline_date);
 
   if (!selectedMonth || !deadlineMonth) {
     return `${formatNumber(row.remaining_business_days)}일`;
   }
 
-  if (selectedMonth < deadlineMonth) return "영업마감";
-  if (selectedMonth > deadlineMonth) return "영업예정";
-  if (row.remaining_business_days <= 0) return "영업마감";
+  if (selectedMonth > deadlineMonth) return "영업마감";
   return `${formatNumber(row.remaining_business_days)}일`;
 }
 
@@ -194,6 +290,13 @@ function getSelectedMonthLabel() {
   const monthInput = document.querySelector("#reportMonth");
   if (monthInput && monthInput.value) {
     return monthInput.value;
+  }
+  // input.html has no #reportMonth selector - fall back to the month the
+  // typed date's figures actually describe (its effective date), not
+  // today's real calendar month.
+  const dateInput = document.querySelector("#date");
+  if (dateInput && dateInput.value) {
+    return getMonthKey(getEffectiveDate(dateInput.value)) || getMonthKey(dateInput.value);
   }
   return getMonthKey(toDateInputValue(new Date()));
 }

@@ -226,6 +226,7 @@ input:focus {
 
 .target-fields {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
 }
 
 .rate-fields {
@@ -1977,6 +1978,20 @@ th {
   text-align: right;
 }
 
+.partner-table th.sortable-th {
+  cursor: pointer;
+  user-select: none;
+}
+
+.partner-table th.sortable-th:hover {
+  color: var(--blue, #1d4ed8);
+}
+
+.partner-table th.sortable-th .sort-arrow {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
 .trend-badge {
   display: inline-flex;
   align-items: center;
@@ -2238,5 +2253,100 @@ th {
   background: linear-gradient(to bottom, #fff7ed, #ffffff);
 }
 
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent, #2563eb);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.deadline-manager {
+  margin-top: 8px;
+}
+
+.deadline-manager-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.deadline-manager-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.deadline-manager-add button {
+  flex: 0 0 auto;
+  border: none;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.deadline-manager-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 8px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  background: #fff;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.deadline-manager-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.deadline-manager-list li .deadline-manager-month {
+  flex: 0 0 auto;
+  font-weight: 700;
+  min-width: 64px;
+}
+
+.deadline-manager-list li input[type="date"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.deadline-manager-list li button {
+  flex: 0 0 auto;
+  border: none;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.deadline-manager-list .deadline-manager-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
 
 

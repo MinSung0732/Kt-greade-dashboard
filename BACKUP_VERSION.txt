@@ -1,0 +1,10 @@
+KT Grade Report backup version: v6.1_20260629_partnerfix
+Created: 2026-06-29
+
+Included fixes:
+- Prevent rate settings from being overwritten by loaded row values.
+- Use saved DB rate settings in Excel export.
+- Fix partner page duplicate currentStart declaration syntax error.
+- Align partner internet counts with online/wholesale internet parsing.
+- Use selected 기준일 as the monthly partner aggregation cutoff.
+- Exclude future snapshots from latest partner activation display.
