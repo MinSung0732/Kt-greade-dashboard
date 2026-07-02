@@ -417,6 +417,12 @@ function finalizeSummary(summary, currentRow) {
   summary.date = originalSummaryDate;
 }
 
+let lastSavedRowDate = null;
+
+function markRowAsSaved(date) {
+  lastSavedRowDate = date;
+}
+
 function renderHistory(rows) {
   const recentRows = rows.slice(-10).reverse();
 
@@ -425,11 +431,14 @@ function renderHistory(rows) {
     return;
   }
 
+  const savedDate = lastSavedRowDate;
+  lastSavedRowDate = null;
+
   historyBody.innerHTML = recentRows
     .map(
       (row) => `
-        <tr>
-          <td>${escapeHtml(row.date)}</td>
+        <tr class="${row.date === savedDate ? "history-row-saved" : ""}">
+          <td>${escapeHtml(row.date)}${row.date === savedDate ? '<span class="history-saved-badge">저장됨 ✓</span>' : ""}</td>
           <td>${formatNumber(row.open_online_internet)}</td>
           <td>${formatNumber(row.open_wholesale_internet)}</td>
           <td>${formatNumber(row.install_online_internet)}</td>
@@ -444,6 +453,14 @@ function renderHistory(rows) {
       `,
     )
     .join("");
+
+  if (savedDate) {
+    const savedRow = historyBody.querySelector(".history-row-saved");
+    if (savedRow) {
+      savedRow.scrollIntoView({ block: "nearest" });
+      setTimeout(() => savedRow.classList.remove("history-row-saved"), 2500);
+    }
+  }
 }
 
 function getLocalRows() {

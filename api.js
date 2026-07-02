@@ -119,12 +119,21 @@ async function saveSettings() {
     mu_tiers: typeof currentSettings.mu_tiers === 'string' ? currentSettings.mu_tiers : compressTiers(currentSettings.mu_tiers, true),
   };
 
+  const saveBtn = document.querySelector("#saveSettingsBtn");
+  const originalBtnText = saveBtn?.textContent;
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "저장 중...";
+    saveBtn.classList.remove("settings-save-btn--success", "settings-save-btn--error");
+  }
+
   try {
     const apiUrl = getApiUrl();
     if (!apiUrl) {
       applySettings(settings);
       localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
       showMessage("설정이 로컬에 임시 저장되었습니다.");
+      flashSettingsSaveButton(saveBtn, originalBtnText, "success", "저장됨 ✓");
       return;
     }
     const response = await fetch(apiUrl, {
@@ -147,7 +156,20 @@ async function saveSettings() {
     renderHistory(dashboardRows);
     renderDashboard(getDashboardSummary());
     showMessage("설정이 Google Sheets에 저장되었습니다.");
+    flashSettingsSaveButton(saveBtn, originalBtnText, "success", "저장됨 ✓");
   } catch (error) {
     showMessage(`설정 저장 오류: ${formatScriptError(error)}`);
+    flashSettingsSaveButton(saveBtn, originalBtnText, "error", "저장 실패");
   }
+}
+
+function flashSettingsSaveButton(button, originalText, type, flashText) {
+  if (!button) return;
+  button.disabled = false;
+  button.textContent = flashText;
+  button.classList.add(type === "success" ? "settings-save-btn--success" : "settings-save-btn--error");
+  setTimeout(() => {
+    button.textContent = originalText;
+    button.classList.remove("settings-save-btn--success", "settings-save-btn--error");
+  }, 2000);
 }

@@ -16,6 +16,13 @@ function initExcelUpload() {
     }
   });
 
+  dropZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+
   dropZone.addEventListener('dragenter', (e) => {
     e.preventDefault();
   });

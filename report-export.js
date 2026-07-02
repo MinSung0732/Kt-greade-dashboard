@@ -378,7 +378,9 @@
     const totalExpected = comparison.channels.reduce((total, channel) => total + channel.expected, 0);
 
     const remaining = Math.max(comparison.target - totalExpected, 0);
-    const requiredInstallations = comparison.internetRate > 0 ? remaining / comparison.internetRate : remaining;
+    const requiredInstallations = comparison.internetRate > 0
+      ? Math.ceil(remaining / comparison.internetRate)
+      : remaining;
     const dailyNeed = comparison.remainingBusinessDays > 0
       ? Math.floor(requiredInstallations / comparison.remainingBusinessDays)
       : 0;
@@ -400,21 +402,31 @@
     sheet.getCell(totalRow, 11).numFmt = "#,##0\" 건\"";
 
     const needRow = row + 9;
-    [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]].forEach(([start, end]) => {
+    [[1, 2], [4, 5], [7, 8], [10, 11]].forEach(([start, end]) => {
       sheet.mergeCells(needRow, start, needRow, end);
     });
-    [[1, "목표까지 필요"], [3, remaining], [5, "남은 영업일"], [7, comparison.remainingBusinessDays], [9, "일 필요"], [11, dailyNeed]]
-      .forEach(([column, value]) => {
-        sheet.getCell(needRow, column).value = value;
-      });
+    const ratePercent = Math.round(comparison.internetRate * 100);
+    [
+      [1, "목표까지 필요"],
+      [3, remaining],
+      [4, `가설 필요(개통율 ${ratePercent}%)`],
+      [6, requiredInstallations],
+      [7, "남은 영업일"],
+      [9, comparison.remainingBusinessDays],
+      [10, "일 필요"],
+      [12, dailyNeed],
+    ].forEach(([column, value]) => {
+      sheet.getCell(needRow, column).value = value;
+    });
     sheet.getRow(needRow).height = 24;
     styleRange(sheet, `A${needRow}:L${needRow}`, {
       fill: COLORS.paleGray,
       font: { bold: true, color: { argb: "9C0006" } },
     });
     sheet.getCell(needRow, 3).numFmt = "#,##0\" 건\"";
-    sheet.getCell(needRow, 7).numFmt = "0\" 일\"";
-    sheet.getCell(needRow, 11).numFmt = "#,##0\" 건\"";
+    sheet.getCell(needRow, 6).numFmt = "#,##0\" 건\"";
+    sheet.getCell(needRow, 9).numFmt = "0\" 일\"";
+    sheet.getCell(needRow, 12).numFmt = "#,##0\" 건\"";
   }
 
   function addStatusTable(sheet, startRow, title, summary, prefix, comparison) {

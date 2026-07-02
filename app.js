@@ -135,13 +135,14 @@ function bindEvents() {
     renderDeadlineManager();
     debouncedRenderDashboard();
   });
-  document.querySelector("#toggleDeadlineManagerBtn")?.addEventListener("click", () => {
+  document.querySelector("#toggleDeadlineManagerBtn")?.addEventListener("click", (event) => {
     const list = document.querySelector("#deadlineManagerList");
     const addRow = document.querySelector("#deadlineManagerAdd");
     if (!list) return;
     const willShow = list.hidden;
     list.hidden = !willShow;
     if (addRow) addRow.hidden = !willShow;
+    event.currentTarget.setAttribute("aria-expanded", String(willShow));
     if (willShow) renderDeadlineManager();
   });
   document.querySelector("#addDeadlineBtn")?.addEventListener("click", async () => {
@@ -191,6 +192,9 @@ function bindEvents() {
     event.preventDefault();
     await saveCurrentRow();
   });
+
+  document.querySelector("#entryTabOpenBtn")?.addEventListener("click", () => switchEntryTab("open"));
+  document.querySelector("#entryTabInstallBtn")?.addEventListener("click", () => switchEntryTab("install"));
 
   document.querySelector("#compareBtn")?.addEventListener("click", compareWithPreviousDay);
   document.querySelector("#resetBtn")?.addEventListener("click", resetForm);
@@ -254,9 +258,9 @@ async function downloadDashboardReport() {
       reportMonth,
       settings: typeof currentSettings !== "undefined" ? currentSettings : {},
     });
-    showMessage("엑셀 보고서를 다운로드했습니다.");
+    showMessage("엑셀 보고서를 다운로드했습니다.", "success");
   } catch (error) {
-    showMessage(`보고서 생성 실패: ${error.message}`);
+    showMessage(`보고서 생성 실패: ${error.message}`, "error");
   } finally {
     if (button) {
       button.disabled = false;
@@ -276,20 +280,33 @@ async function saveCurrentRowWithOptions({ silent = false, reload = true } = {})
   };
 
   if (!row.date) {
-    if (!silent) showMessage("날짜를 입력하세요.");
+    if (!silent) showMessage("날짜를 입력하세요.", "error");
     return false;
+  }
+
+  const submitBtn = form?.querySelector('button[type="submit"]');
+  const originalText = submitBtn?.textContent;
+  if (!silent && submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "저장 중...";
   }
 
   try {
     await saveRow(row);
     dashboardRows = upsertByDate(dashboardRows, row);
     renderDashboard(getDashboardSummary());
-    if (!silent) showMessage("저장되었습니다.");
+    if (!silent) showMessage("저장되었습니다.", "success");
+    if (!silent && typeof markRowAsSaved === "function") markRowAsSaved(row.date);
     if (reload) await loadRecentRows();
     return true;
   } catch (error) {
-    showMessage(`${silent ? "자동 저장" : "저장"} 실패: ${error.message}`);
+    showMessage(`${silent ? "자동 저장" : "저장"} 실패: ${error.message}`, "error");
     return false;
+  } finally {
+    if (!silent && submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
   }
 }
 
@@ -325,7 +342,7 @@ async function loadRecentRows() {
     }
     return rows;
   } catch (error) {
-    showMessage(`조회 실패: ${error.message}`);
+    showMessage(`조회 실패: ${error.message}`, "error");
     return [];
   }
 }
@@ -345,11 +362,28 @@ async function compareWithPreviousDay() {
   showMessage(`${previous.date} 데이터와 비교했습니다.`);
 }
 
+function switchEntryTab(tab) {
+  const openBtn = document.querySelector("#entryTabOpenBtn");
+  const installBtn = document.querySelector("#entryTabInstallBtn");
+  const openPanel = document.querySelector("#entryTabOpenPanel");
+  const installPanel = document.querySelector("#entryTabInstallPanel");
+  if (!openBtn || !installBtn || !openPanel || !installPanel) return;
+
+  const showOpen = tab === "open";
+  openBtn.classList.toggle("active", showOpen);
+  installBtn.classList.toggle("active", !showOpen);
+  openBtn.setAttribute("aria-selected", String(showOpen));
+  installBtn.setAttribute("aria-selected", String(!showOpen));
+  openPanel.hidden = !showOpen;
+  installPanel.hidden = showOpen;
+}
+
 async function resetForm() {
+  if (!window.confirm("입력한 값을 모두 초기화할까요? 저장하지 않은 내용은 사라집니다.")) return;
   form.reset();
   document.querySelector("#date").value = toDateInputValue(new Date());
   clearDailyInputs();
   await loadSettings();
   renderDashboard(getDashboardSummary());
-  showMessage("초기화되었습니다.");
+  showMessage("초기화되었습니다.", "success");
 }

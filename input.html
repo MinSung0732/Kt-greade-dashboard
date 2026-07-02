@@ -27,82 +27,103 @@
           </div>
         </div>
 
-        <section class="settings-dock" aria-label="고정 설정">
-          <div class="dock-group target-group">
-            <span class="dock-title">목표 설정</span>
-            <div class="target-fields">
-              <label>
-                인터넷 목표
-                <input type="number" min="0" step="1" id="targetCount" value="1375" />
-              </label>
-              <label>
-                온라인 목표
-                <input type="number" min="0" step="1" id="onlineTargetCount" value="500" />
-              </label>
-              <label>
-                유심+기기 목표
-                <input type="number" min="0" step="1" id="muTargetCount" value="600" />
-              </label>
-              <label>
-                목표Point
-                <input type="number" min="0" step="1" id="targetPoint" value="3500" />
-              </label>
-              <label>
-                마감일
-                <input type="date" id="deadlineDate" title="월별 접수마감일" />
-                <small class="field-hint" id="deadlineMonthTarget">보고 월별로 저장됩니다</small>
-              </label>
-              <div class="business-day-box">
-                <span>남은 영업일수</span>
-                <strong id="remainingBusinessDaysView">0일</strong>
+        <details class="settings-accordion" id="settingsAccordion">
+          <summary class="settings-accordion-summary">
+            <span>목표 · 개통율 · 구간 설정</span>
+            <span class="settings-accordion-hint">펼쳐서 보기</span>
+          </summary>
+          <section class="settings-dock" aria-label="고정 설정">
+            <div class="settings-dock-top">
+              <div class="dock-group target-group">
+                <span class="dock-title">목표 설정</span>
+                <div class="target-fields">
+                  <label>
+                    인터넷 목표
+                    <input type="number" min="0" step="1" id="targetCount" value="1375" />
+                  </label>
+                  <label>
+                    온라인 목표
+                    <input type="number" min="0" step="1" id="onlineTargetCount" value="500" />
+                  </label>
+                  <label>
+                    유심+기기 목표
+                    <input type="number" min="0" step="1" id="muTargetCount" value="600" />
+                  </label>
+                  <label>
+                    목표 포인트
+                    <input type="number" min="0" step="1" id="targetPoint" value="3500" />
+                  </label>
+                  <label>
+                    마감일
+                    <input type="date" id="deadlineDate" title="월별 접수마감일" />
+                    <small class="field-hint" id="deadlineMonthTarget">보고 월별로 저장됩니다</small>
+                  </label>
+                  <div class="business-day-box">
+                    <span>남은 영업일수</span>
+                    <strong id="remainingBusinessDaysView">0일</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="dock-group rate-group">
+                <span class="dock-title">개통율 설정</span>
+                <div class="rate-fields">
+                  <label>
+                    인터넷
+                    <span class="percent-input">
+                      <input type="number" min="0" max="100" step="1" id="internetOpenRate" value="75" aria-label="인터넷 개통율 (%)" />
+                    </span>
+                  </label>
+                  <label>
+                    TV
+                    <span class="percent-input">
+                      <input type="number" min="0" max="100" step="1" id="tvOpenRate" value="75" aria-label="TV 개통율 (%)" />
+                    </span>
+                  </label>
+                  <label>
+                    유심
+                    <span class="percent-input">
+                      <input type="number" min="0" max="100" step="1" id="usimOpenRate" value="50" aria-label="유심 개통율 (%)" />
+                    </span>
+                  </label>
+                  <label>
+                    기기
+                    <span class="percent-input">
+                      <input type="number" min="0" max="100" step="1" id="deviceOpenRate" value="50" aria-label="기기 개통율 (%)" />
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="dock-actions">
+                <button type="button" class="settings-save-btn outline" id="openTiersModalBtn">구간/금액 설정</button>
+                <button type="button" class="settings-save-btn" id="saveSettingsBtn">설정 저장</button>
               </div>
             </div>
-            <div class="deadline-manager" id="deadlineManager">
-              <button type="button" id="toggleDeadlineManagerBtn" class="link-btn">월별 마감일 목록 보기/수정</button>
-              <div class="deadline-manager-add" id="deadlineManagerAdd" hidden>
-                <input type="month" id="addDeadlineMonth" title="대상 월" />
-                <input type="date" id="addDeadlineDate" title="마감일" />
-                <button type="button" id="addDeadlineBtn">추가</button>
+          </section>
+        </details>
+
+        <details class="settings-accordion" id="deadlineAccordion">
+          <summary class="settings-accordion-summary">
+            <span>월별 마감일 관리</span>
+            <span class="settings-accordion-hint">펼쳐서 보기</span>
+          </summary>
+          <section class="settings-dock" aria-label="월별 마감일 관리">
+            <div class="settings-dock-bottom">
+              <div class="dock-group deadline-manager-group">
+                <div class="deadline-manager" id="deadlineManager">
+                  <button type="button" id="toggleDeadlineManagerBtn" class="link-btn" aria-expanded="false" aria-controls="deadlineManagerList deadlineManagerAdd">월별 마감일 목록 보기/수정</button>
+                  <div class="deadline-manager-add" id="deadlineManagerAdd" hidden>
+                    <input type="month" id="addDeadlineMonth" title="대상 월" />
+                    <input type="date" id="addDeadlineDate" title="마감일" />
+                    <button type="button" id="addDeadlineBtn">추가</button>
+                  </div>
+                  <ul class="deadline-manager-list" id="deadlineManagerList" hidden></ul>
+                </div>
               </div>
-              <ul class="deadline-manager-list" id="deadlineManagerList" hidden></ul>
             </div>
-          </div>
-
-          <div class="dock-group rate-group">
-            <span class="dock-title">개통율 설정</span>
-            <div class="rate-fields">
-              <label>
-                인터넷
-                <span class="percent-input">
-                  <input type="number" min="0" max="100" step="1" id="internetOpenRate" value="75" />
-                </span>
-              </label>
-              <label>
-                TV
-                <span class="percent-input">
-                  <input type="number" min="0" max="100" step="1" id="tvOpenRate" value="75" />
-                </span>
-              </label>
-              <label>
-                유심
-                <span class="percent-input">
-                  <input type="number" min="0" max="100" step="1" id="usimOpenRate" value="50" />
-                </span>
-              </label>
-              <label>
-                기기
-                <span class="percent-input">
-                  <input type="number" min="0" max="100" step="1" id="deviceOpenRate" value="50" />
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div class="dock-actions">
-            <button type="button" class="settings-save-btn" style="border-color:#2864ad; color:#2864ad;" id="openTiersModalBtn">구간/금액 설정</button>
-            <button type="button" class="settings-save-btn" id="saveSettingsBtn">설정 저장</button>
-          </div>
-        </section>
+          </section>
+        </details>
       </header>
 
       <section class="summary-grid" aria-label="주요 지표">
@@ -149,7 +170,7 @@
         <article class="metric-card total-card accent-rose">
           <span class="metric-label">총 개통예상</span>
           <strong id="expectedInternetView">0</strong>
-          <div id="expectedInternetBreakdown" style="font-size: 0.85em; color: var(--color-gray-600); margin-top: -5px; margin-bottom: 10px; font-weight: 600;">(온라인 0 + 도매 0)</div>
+          <div id="expectedInternetBreakdown" class="breakdown-note">(온라인 0 + 도매 0)</div>
           <small id="expectedInternetDelta">비교 대기</small>
         </article>
       </section>
@@ -159,12 +180,28 @@
           <div class="panel-head">
             <div>
               <p class="eyebrow">Input</p>
-              <h2 style="white-space: nowrap;">전체 개통 / 가설 입력</h2>
+              <h2 class="nowrap">전체 개통 / 가설 입력</h2>
             </div>
             <input type="date" id="date" name="date" required />
           </div>
 
-          <div class="entry-block">
+          <div class="excel-upload-zone" id="excelUploadZone" role="button" tabindex="0" aria-label="엑셀 파일(인터넷/TV/유심/기기)을 드래그하여 놓거나 클릭하여 업로드">
+            <div class="icon" aria-hidden="true">📁</div>
+            <p><strong>엑셀 파일(인터넷/TV/유심/기기)</strong>을 드래그하여 놓거나 클릭하여 업로드</p>
+            <div class="upload-note">
+              파일 이름에 아래 단어가 포함되어야 해당 항목으로 <strong>자동 분류</strong>합니다.<br/>
+              <strong class="emphasis">개통완료:</strong> 인터넷_개통완료, TV_개통완료, 유심_개통완료, 기기_개통완료<br/>
+              <strong class="emphasis">가설중:</strong> 인터넷_가설중, TV_가설중, 유심_가설중, 기기_가설중
+            </div>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" multiple class="visually-hidden-input" />
+          </div>
+
+          <div class="entry-tabs" role="tablist" aria-label="개통 완료 / 가설 접수">
+            <button type="button" class="entry-tab-btn active" id="entryTabOpenBtn" role="tab" aria-selected="true" aria-controls="entryTabOpenPanel">개통 완료</button>
+            <button type="button" class="entry-tab-btn" id="entryTabInstallBtn" role="tab" aria-selected="false" aria-controls="entryTabInstallPanel">가설 접수</button>
+          </div>
+
+          <div class="entry-block entry-tab-panel" id="entryTabOpenPanel" role="tabpanel" aria-labelledby="entryTabOpenBtn">
             <div class="entry-title">
               <h3>개통 완료</h3>
               <span>온라인 / 도매</span>
@@ -192,11 +229,11 @@
                     <td><input type="number" min="0" step="1" id="openWholesaleMainTv" value="0" /></td>
                     <td><input type="number" min="0" step="1" id="openWholesaleExtra" value="0" /></td>
                   </tr>
-                  <tr class="total-row">
+                  <tr class="total-row" aria-live="polite">
                     <th>총합</th>
-                    <td><input type="text" id="openTotalInternet" value="0" readonly class="readonly-input" tabindex="-1" /></td>
-                    <td><input type="text" id="openTotalMainTv" value="0" readonly class="readonly-input" tabindex="-1" /></td>
-                    <td><input type="text" id="openTotalExtra" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                    <td><input type="text" id="openTotalInternet" value="0" readonly class="readonly-input" tabindex="-1" aria-label="개통 완료 인터넷 총합" /></td>
+                    <td><input type="text" id="openTotalMainTv" value="0" readonly class="readonly-input" tabindex="-1" aria-label="개통 완료 메인TV 총합" /></td>
+                    <td><input type="text" id="openTotalExtra" value="0" readonly class="readonly-input" tabindex="-1" aria-label="개통 완료 추가단말 총합" /></td>
                   </tr>
                 </tbody>
               </table>
@@ -210,14 +247,14 @@
                 유심(U)
                 <input type="number" min="0" step="1" id="openMobileUsim" value="0" />
               </label>
-              <label>
+              <label title="메인 회선과 함께 접수된 동반유심 건수">
                 메인동반유심
                 <input type="number" min="0" step="1" id="mainDongpanUsim" value="0" />
               </label>
             </div>
           </div>
 
-          <div class="entry-block">
+          <div class="entry-block entry-tab-panel" id="entryTabInstallPanel" role="tabpanel" aria-labelledby="entryTabInstallBtn" hidden>
             <div class="entry-title">
               <h3>가설 접수</h3>
               <span>접수 후 개통 대기</span>
@@ -245,11 +282,11 @@
                     <td><input type="number" min="0" step="1" id="installWholesaleMainTv" value="0" /></td>
                     <td><input type="number" min="0" step="1" id="installWholesaleExtra" value="0" /></td>
                   </tr>
-                  <tr class="total-row">
+                  <tr class="total-row" aria-live="polite">
                     <th>총합</th>
-                    <td><input type="text" id="installTotalInternet" value="0" readonly class="readonly-input" tabindex="-1" /></td>
-                    <td><input type="text" id="installTotalMainTv" value="0" readonly class="readonly-input" tabindex="-1" /></td>
-                    <td><input type="text" id="installTotalExtra" value="0" readonly class="readonly-input" tabindex="-1" /></td>
+                    <td><input type="text" id="installTotalInternet" value="0" readonly class="readonly-input" tabindex="-1" aria-label="가설 접수 인터넷 총합" /></td>
+                    <td><input type="text" id="installTotalMainTv" value="0" readonly class="readonly-input" tabindex="-1" aria-label="가설 접수 메인TV 총합" /></td>
+                    <td><input type="text" id="installTotalExtra" value="0" readonly class="readonly-input" tabindex="-1" aria-label="가설 접수 추가단말 총합" /></td>
                   </tr>
                 </tbody>
               </table>
@@ -300,7 +337,7 @@
 
           <div class="progress-block">
             <div class="progress-copy">
-              <span>모바일 목표 달성률<span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
+              <span>모바일 목표 달성률<span class="progress-target-hint">(목표: <span id="dashMyMobileTargetView">0</span>건)</span></span>
               <strong id="mobileProgressText">0%</strong>
             </div>
             <div class="progress-track">
@@ -326,11 +363,11 @@
               <dd id="dailyNeedView">0</dd>
             </div>
             <div>
-              <dt>목표달성 현재</dt>
+              <dt>TV+M/U 포인트 현재</dt>
               <dd id="tvCurrentPointView">0</dd>
             </div>
             <div>
-              <dt>달성목표</dt>
+              <dt>TV+M/U 포인트 목표</dt>
               <dd id="tvTargetPointView">0</dd>
             </div>
             <div>
@@ -353,17 +390,6 @@
         </aside>
 
         <aside class="sidebar-panel">
-          <div class="excel-upload-zone" id="excelUploadZone">
-            <div class="icon">📁</div>
-            <p><strong>엑셀 파일(인터넷/TV/유심/기기)</strong>을 드래그하여 놓거나 클릭하여 업로드</p>
-            <div style="font-size: 12.5px; color: var(--color-gray-500); margin-top: 8px; line-height: 1.5;">
-              파일 이름에 아래 단어가 포함되어야 해당 항목으로 <strong>자동 분류</strong>합니다.<br/>
-              <strong style="color: var(--color-gray-700);">개통완료:</strong> 인터넷_개통완료, TV_개통완료, 유심_개통완료, 기기_개통완료<br/>
-              <strong style="color: var(--color-gray-700);">가설중:</strong> 인터넷_가설중, TV_가설중, 유심_가설중, 기기_가설중
-            </div>
-            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" multiple style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;" />
-          </div>
-
           <section class="history-section">
             <div class="panel-head">
               <div>
@@ -400,7 +426,7 @@
         <div class="modal-dialog">
           <div class="modal-header">
             <h2>구간 및 금액 설정</h2>
-            <button type="button" class="modal-close" id="closeTiersModalBtn">&times;</button>
+            <button type="button" class="modal-close" id="closeTiersModalBtn" aria-label="닫기">&times;</button>
           </div>
           <div class="modal-body">
             <div>
@@ -408,7 +434,7 @@
                 <span>TV + M/U 합산 목표 구간</span>
                 <button type="button" id="addTvmuTierBtn">+ 추가</button>
               </div>
-              <div style="max-height:200px; overflow-y:auto; border:1px solid var(--line);">
+              <div class="modal-table-scroll">
                 <table class="modal-table">
                   <thead>
                     <tr>
@@ -426,7 +452,7 @@
                 <span>도매 온라인 M/U 목표 구간</span>
                 <button type="button" id="addMuTierBtn">+ 추가</button>
               </div>
-              <div style="max-height:200px; overflow-y:auto; border:1px solid var(--line);">
+              <div class="modal-table-scroll">
                 <table class="modal-table">
                   <thead>
                     <tr>
@@ -441,7 +467,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" id="resetTiersBtn" style="margin-right:auto;">기본값 초기화</button>
+            <button type="button" id="resetTiersBtn" class="modal-footer-left">기본값 초기화</button>
             <button type="button" id="cancelTiersBtn">취소</button>
             <button type="button" class="primary" id="applyTiersBtn">확인 및 저장</button>
           </div>

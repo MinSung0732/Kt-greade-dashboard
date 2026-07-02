@@ -64,17 +64,21 @@ function setSavedRateSettingValue(id, value) {
 }
 
 let messageTimeout = null;
-function showMessage(text) {
+function showMessage(text, type = "info") {
   if (!message) return;
   if (message.innerHTML && messageTimeout) {
     message.innerHTML += `<br/>${text}`;
   } else {
     message.innerHTML = text;
   }
-  
+  message.classList.remove("message--success", "message--error");
+  if (type === "success") message.classList.add("message--success");
+  if (type === "error") message.classList.add("message--error");
+
   clearTimeout(messageTimeout);
   messageTimeout = setTimeout(() => {
     message.innerHTML = '';
+    message.classList.remove("message--success", "message--error");
     messageTimeout = null;
   }, 7000);
 }
@@ -113,24 +117,39 @@ function renderDeadlineMonthTarget() {
   el.textContent = `현재 ${year}년 ${Number(mon)}월 마감일로 저장됩니다`;
 }
 
+function getDeadlineDDayLabel(deadlineValue, todayValue) {
+  const deadline = new Date(`${deadlineValue}T00:00:00`);
+  const today = new Date(`${todayValue}T00:00:00`);
+  if (Number.isNaN(deadline.getTime()) || Number.isNaN(today.getTime())) return "";
+  const diffDays = Math.round((deadline - today) / 86400000);
+  if (diffDays > 0) return `D-${diffDays}`;
+  if (diffDays === 0) return "D-Day";
+  return "마감";
+}
+
 function renderDeadlineManager() {
   const list = document.querySelector("#deadlineManagerList");
   if (!list) return;
   const deadlines = parseMonthlyDeadlines(currentSettings.monthly_deadlines);
-  const months = Object.keys(deadlines).sort();
+  const months = Object.keys(deadlines).sort().reverse();
 
   if (!months.length) {
     list.innerHTML = '<li class="deadline-manager-empty">저장된 월별 마감일이 없습니다.</li>';
     return;
   }
 
+  const todayValue = toDateInputValue(new Date());
+
   list.innerHTML = months
     .map((month) => {
       const [year, mon] = month.split("-");
+      const deadlineValue = deadlines[month] || "";
+      const dDay = deadlineValue ? getDeadlineDDayLabel(deadlineValue, todayValue) : "";
       return `
         <li data-month="${escapeHtml(month)}">
           <span class="deadline-manager-month">${escapeHtml(year)}년 ${Number(mon)}월</span>
-          <input type="date" value="${escapeHtml(deadlines[month] || "")}" data-role="deadline-manager-input" />
+          <input type="date" value="${escapeHtml(deadlineValue)}" data-role="deadline-manager-input" />
+          ${dDay ? `<span class="deadline-manager-dday${dDay === "마감" ? " is-past" : ""}">${escapeHtml(dDay)}</span>` : ""}
           <button type="button" data-role="deadline-manager-delete">삭제</button>
         </li>
       `;
@@ -195,23 +214,34 @@ function buildTierRow(type, criteriaValue, paymentValue) {
 
 function removeTierRow(btn) {
   const tr = btn.closest("tr");
-  if (tr) tr.remove();
+  if (!tr) return;
+  const inputs = tr.querySelectorAll("input");
+  const hasValue = Array.from(inputs).some((input) => String(input.value || "").trim() !== "");
+  if (hasValue && !window.confirm("이 구간을 삭제할까요?")) return;
+  tr.remove();
 }
 
 async function applyTiersFromModal() {
   const tvmuRows = Array.from(document.querySelectorAll("#tvmuTiersBody tr"));
-  const newTvmu = tvmuRows.map(tr => {
+  const tvmuParsed = tvmuRows.map(tr => {
     const p = parseFloat(tr.querySelector(".tvmu-criteria").value);
     const pay = parseFloat(tr.querySelector(".tvmu-payment").value);
     return { point: isNaN(p) ? 0 : p, payment: isNaN(pay) ? 0 : pay };
-  }).filter(t => t.point > 0).sort((a, b) => a.point - b.point);
+  });
+  const newTvmu = tvmuParsed.filter(t => t.point > 0).sort((a, b) => a.point - b.point);
 
   const muRows = Array.from(document.querySelectorAll("#muTiersBody tr"));
-  const newMu = muRows.map(tr => {
+  const muParsed = muRows.map(tr => {
     const c = parseFloat(tr.querySelector(".mu-criteria").value);
     const pay = parseFloat(tr.querySelector(".mu-payment").value);
     return { count: isNaN(c) ? 0 : c, payment: isNaN(pay) ? 0 : pay };
-  }).filter(t => t.count > 0).sort((a, b) => a.count - b.count);
+  });
+  const newMu = muParsed.filter(t => t.count > 0).sort((a, b) => a.count - b.count);
+
+  const droppedCount = (tvmuParsed.length - newTvmu.length) + (muParsed.length - newMu.length);
+  if (droppedCount > 0) {
+    showMessage(`Point/건수가 0 이하이거나 비어있는 구간 ${droppedCount}개는 저장되지 않았습니다.`, "error");
+  }
 
   if (window.KTGoal && window.KTGoal.setTiers) {
     window.KTGoal.setTiers(newTvmu, newMu);
@@ -230,7 +260,7 @@ async function applyTiersFromModal() {
 }
 
 async function resetTiersToDefault() {
-  if (confirm("기본 구간값으로 초기화하고 즉시 반영하시겠습니까?")) {
+  if (confirm("기본 구간값으로 초기화하고 페이지를 새로고침합니다. 계속할까요?")) {
     currentSettings.tvmu_tiers = "";
     currentSettings.mu_tiers = "";
     if (typeof saveSettings === "function") {
