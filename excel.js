@@ -60,6 +60,41 @@ if (document.readyState === 'loading') {
   initExcelUpload();
 }
 
+// Some systems export ".xls"/".csv" files that are actually an HTML table (or
+// plain delimited text) saved with a legacy Korean encoding (EUC-KR) instead
+// of a real binary/OOXML workbook. Handing those raw bytes to XLSX.read()
+// still "succeeds" but decodes the Korean text as UTF-8, garbling every
+// keyword the parsers search for (개통상태, 온라인, 도매, ...) and silently
+// producing 0 counts. Detect that case and re-decode with the right charset
+// before parsing.
+function readWorkbookFromBytes(bytes) {
+  const isZip = bytes[0] === 0x50 && bytes[1] === 0x4B; // xlsx/xlsm (OOXML)
+  const isOle = bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0; // real .xls (BIFF)
+
+  if (isZip || isOle) {
+    return XLSX.read(bytes, { type: 'array' });
+  }
+
+  // Sniff a declared charset from the raw bytes (the "charset=" text itself
+  // is plain ASCII regardless of the body's encoding, so this is safe to read
+  // before we know the real encoding).
+  const preview = String.fromCharCode(...bytes.subarray(0, Math.min(2000, bytes.length)));
+  const charsetMatch = preview.match(/charset=["']?([\w-]+)/i);
+  let charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
+  if (charset === 'ks_c_5601-1987' || charset === 'ksc5601' || charset === 'korean') {
+    charset = 'euc-kr';
+  }
+
+  let text;
+  try {
+    text = new TextDecoder(charset).decode(bytes);
+  } catch (err) {
+    text = new TextDecoder('utf-8').decode(bytes);
+  }
+
+  return XLSX.read(text, { type: 'string' });
+}
+
 function processExcelFile(file) {
   if (!window.XLSX) {
     showMessage('엑셀 처리 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
@@ -70,7 +105,7 @@ function processExcelFile(file) {
   reader.onload = (e) => {
     try {
       const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
+      const workbook = readWorkbookFromBytes(data);
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       
@@ -87,12 +122,12 @@ function processExcelFile(file) {
       let category = '';
       let isCompleted = true;
       
-      if (fileName.includes('인터넷')) category = 'internet';
-      else if (fileName.includes('TV')) category = 'tv';
-      else if (fileName.includes('유심')) category = 'usim';
-      else if (fileName.includes('기기')) category = 'device';
-      
-      if (fileName.includes('가설중')) isCompleted = false;
+      if (fileName.includes('인터넷') || fileName.includes('인개통') || fileName.includes('인가설')) category = 'internet';
+      else if (fileName.includes('TV') || fileName.includes('티개통') || fileName.includes('티가설')) category = 'tv';
+      else if (fileName.includes('유심') || fileName.includes('유개통') || fileName.includes('유가설')) category = 'usim';
+      else if (fileName.includes('기기') || fileName.includes('기개통') || fileName.includes('기가설')) category = 'device';
+
+      if (fileName.includes('가설중') || fileName.includes('인가설') || fileName.includes('티가설') || fileName.includes('유가설') || fileName.includes('기가설')) isCompleted = false;
       
       // 2. If filename doesn't classify, run auto-detection and show selection modal
       if (category) {
@@ -329,7 +364,7 @@ function parseInternet(rows, isCompleted, fileName) {
     if (statusIdx >= 0) {
       const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
       if (!isCompleted) {
-        const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
+        const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료', '접수대기'];
         if (!allowedStatuses.some(status => statusVal.includes(status))) {
           isValidRow = false;
         }
@@ -420,7 +455,7 @@ function parseTv(rows, isCompleted, fileName) {
     if (statusIdx >= 0) {
       const statusVal = String(rows[i][statusIdx] || '').replace(/\s+/g, '');
       if (!isCompleted) {
-        const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료'];
+        const allowedStatuses = ['처리중', '접수중', '실적확인중', '접수완료', '접수대기'];
         if (!allowedStatuses.some(status => statusVal.includes(status))) {
           isValidRow = false;
         }

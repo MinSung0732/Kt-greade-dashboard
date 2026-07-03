@@ -313,37 +313,35 @@
   }
 
   function addInternetGoalOverview(sheet, row, comparison) {
-    sheet.mergeCells(`A${row}:L${row}`);
+    sheet.mergeCells(`A${row}:F${row}`);
     sheet.getCell(`A${row}`).value = comparison.available
       ? `인터넷 목표 달성 현황  |  기준 ${comparison.dateRangeLabel}`
       : `인터넷 목표 달성 현황  |  최신 ${comparison.date || "-"} / 비교 기준 없음`;
     sheet.getRow(row).height = 26;
-    styleRange(sheet, `A${row}:L${row}`, {
+    styleRange(sheet, `A${row}:F${row}`, {
       fill: "D9E2F3",
       font: { bold: true, size: 12, color: { argb: COLORS.navy } },
       alignment: { horizontal: "left", vertical: "middle" },
     });
 
-    sheet.mergeCells(`A${row + 1}:B${row + 1}`);
-    sheet.mergeCells(`C${row + 1}:F${row + 1}`);
-    sheet.mergeCells(`G${row + 1}:H${row + 1}`);
-    sheet.mergeCells(`I${row + 1}:J${row + 1}`);
-    sheet.mergeCells(`K${row + 1}:L${row + 1}`);
-    [[1, "경로"], [3, "구분"], [7, "건수"], [9, "가설 개통예상"], [11, "개통율"]]
+    // Table body is intentionally narrower than the header above it (A:F only,
+    // roughly 65% of the section width) so it reads as a compact sub-panel.
+    sheet.mergeCells(`B${row + 1}:C${row + 1}`);
+    [[1, "경로"], [2, "구분"], [4, "건수"], [5, "가설 개통예상"], [6, "개통율"]]
       .forEach(([column, value]) => {
         sheet.getCell(row + 1, column).value = value;
       });
-    sheet.getRow(row + 1).height = 23;
-    styleRange(sheet, `A${row + 1}:L${row + 1}`, {
+    sheet.getRow(row + 1).height = 30;
+    styleRange(sheet, `A${row + 1}:F${row + 1}`, {
       fill: "E7E6E6",
       font: { bold: true, color: { argb: COLORS.navy } },
     });
 
     comparison.channels.forEach((channel, index) => {
       const firstRow = row + 2 + index * 3;
-      sheet.mergeCells(firstRow, 1, firstRow + 2, 2);
+      sheet.mergeCells(firstRow, 1, firstRow + 2, 1);
       sheet.getCell(firstRow, 1).value = channel.label;
-      styleRange(sheet, `A${firstRow}:B${firstRow + 2}`, {
+      styleRange(sheet, `A${firstRow}:A${firstRow + 2}`, {
         fill: index === 0 ? "EAF0F5" : "F2F0ED",
         font: { bold: true, color: { argb: COLORS.blue } },
       });
@@ -355,22 +353,20 @@
       ];
       lines.forEach((values, lineIndex) => {
         const currentRow = firstRow + lineIndex;
-        sheet.mergeCells(currentRow, 3, currentRow, 6);
-        sheet.mergeCells(currentRow, 7, currentRow, 8);
-        sheet.mergeCells(currentRow, 9, currentRow, 10);
-        sheet.mergeCells(currentRow, 11, currentRow, 12);
+        sheet.mergeCells(currentRow, 2, currentRow, 3);
         [values[0], values[1], values[2], values[3]].forEach((value, valueIndex) => {
-          const columns = [3, 7, 9, 11];
+          const columns = [2, 4, 5, 6];
           sheet.getCell(currentRow, columns[valueIndex]).value = value;
         });
-        styleRange(sheet, `C${currentRow}:L${currentRow}`, {
+        styleRange(sheet, `B${currentRow}:F${currentRow}`, {
           fill: lineIndex === 2 ? "FFF8E1" : COLORS.white,
           font: { bold: lineIndex === 2, color: { argb: COLORS.navy } },
         });
-        sheet.getCell(currentRow, 7).numFmt = "#,##0\" 건\"";
+        sheet.getRow(currentRow).height = 26;
+        sheet.getCell(currentRow, 4).numFmt = "#,##0\" 건\"";
         if (lineIndex === 1) {
-          sheet.getCell(currentRow, 9).numFmt = "#,##0\" 건\"";
-          sheet.getCell(currentRow, 11).numFmt = "0%";
+          sheet.getCell(currentRow, 5).numFmt = "#,##0\" 건\"";
+          sheet.getCell(currentRow, 6).numFmt = "0%";
         }
       });
     });
@@ -385,48 +381,66 @@
       ? Math.floor(requiredInstallations / comparison.remainingBusinessDays)
       : 0;
     const totalRow = row + 8;
-    sheet.mergeCells(`A${totalRow}:F${totalRow}`);
-    sheet.mergeCells(`G${totalRow}:H${totalRow}`);
-    sheet.mergeCells(`I${totalRow}:J${totalRow}`);
-    sheet.mergeCells(`K${totalRow}:L${totalRow}`);
+    sheet.mergeCells(`A${totalRow}:C${totalRow}`);
+    sheet.mergeCells(`D${totalRow}:F${totalRow}`);
     sheet.getCell(totalRow, 1).value = "총 개통예상";
-    sheet.getCell(totalRow, 7).value = totalExpected;
-    sheet.getCell(totalRow, 9).value = "목표";
-    sheet.getCell(totalRow, 11).value = comparison.target;
-    sheet.getRow(totalRow).height = 24;
-    styleRange(sheet, `A${totalRow}:L${totalRow}`, {
+    sheet.getCell(totalRow, 4).value = totalExpected;
+    sheet.getRow(totalRow).height = 26;
+    styleRange(sheet, `A${totalRow}:F${totalRow}`, {
       fill: "EAF0F5",
-      font: { bold: true, size: 11, color: { argb: COLORS.navy } },
+      font: { bold: true, size: 12, color: { argb: COLORS.navy } },
     });
-    sheet.getCell(totalRow, 7).numFmt = "#,##0\" 건\"";
-    sheet.getCell(totalRow, 11).numFmt = "#,##0\" 건\"";
+    sheet.getCell(totalRow, 4).numFmt = "#,##0\" 건\"";
 
-    const needRow = row + 9;
-    [[1, 2], [4, 5], [7, 8], [10, 11]].forEach(([start, end]) => {
-      sheet.mergeCells(needRow, start, needRow, end);
+    const targetRow = row + 9;
+    sheet.mergeCells(`B${targetRow}:C${targetRow}`);
+    sheet.mergeCells(`E${targetRow}:F${targetRow}`);
+    sheet.getCell(targetRow, 1).value = "목표";
+    sheet.getCell(targetRow, 2).value = comparison.target;
+    sheet.getCell(targetRow, 4).value = "목표까지 필요";
+    sheet.getCell(targetRow, 5).value = remaining;
+    sheet.getRow(targetRow).height = 26;
+    styleRange(sheet, `A${targetRow}:A${targetRow}`, {
+      fill: "D9E2F3",
+      font: { bold: true, color: { argb: COLORS.navy } },
     });
+    styleRange(sheet, `B${targetRow}:C${targetRow}`, {
+      fill: COLORS.white,
+      font: { bold: true, size: 12, color: { argb: COLORS.navy } },
+    });
+    styleRange(sheet, `D${targetRow}:D${targetRow}`, {
+      fill: "D9E2F3",
+      font: { bold: true, color: { argb: COLORS.navy } },
+    });
+    styleRange(sheet, `E${targetRow}:F${targetRow}`, {
+      fill: COLORS.white,
+      font: { bold: true, size: 12, color: { argb: COLORS.navy } },
+    });
+    sheet.getCell(targetRow, 2).numFmt = "#,##0\" 건\"";
+    sheet.getCell(targetRow, 5).numFmt = "#,##0\" 건\"";
+
+    const needRow = row + 10;
     const ratePercent = Math.round(comparison.internetRate * 100);
-    [
-      [1, "목표까지 필요"],
-      [3, remaining],
-      [4, `가설 필요(개통율 ${ratePercent}%)`],
-      [6, requiredInstallations],
-      [7, "남은 영업일"],
-      [9, comparison.remainingBusinessDays],
-      [10, "일 필요"],
-      [12, dailyNeed],
-    ].forEach(([column, value]) => {
-      sheet.getCell(needRow, column).value = value;
-    });
+    sheet.getCell(needRow, 1).value = `가설 필요(개통율 ${ratePercent}%)`;
+    sheet.getCell(needRow, 2).value = requiredInstallations;
+    sheet.getCell(needRow, 3).value = "남은 영업일";
+    sheet.getCell(needRow, 4).value = comparison.remainingBusinessDays;
+    sheet.getCell(needRow, 5).value = "일 필요";
+    sheet.getCell(needRow, 6).value = dailyNeed;
     sheet.getRow(needRow).height = 24;
-    styleRange(sheet, `A${needRow}:L${needRow}`, {
+    styleRange(sheet, `A${needRow}:F${needRow}`, {
       fill: COLORS.paleGray,
       font: { bold: true, color: { argb: "9C0006" } },
     });
-    sheet.getCell(needRow, 3).numFmt = "#,##0\" 건\"";
+    sheet.getCell(needRow, 1).alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: false,
+      shrinkToFit: true,
+    };
+    sheet.getCell(needRow, 2).numFmt = "#,##0\" 건\"";
+    sheet.getCell(needRow, 4).numFmt = "0\" 일\"";
     sheet.getCell(needRow, 6).numFmt = "#,##0\" 건\"";
-    sheet.getCell(needRow, 9).numFmt = "0\" 일\"";
-    sheet.getCell(needRow, 12).numFmt = "#,##0\" 건\"";
   }
 
   function addStatusTable(sheet, startRow, title, summary, prefix, comparison) {
@@ -495,7 +509,7 @@
       fill: COLORS.white,
     });
     setRangeRow(sheet, startRow + 3, 1, wholesale, `A${startRow + 3}:F${startRow + 3}`, {
-      fill: COLORS.softBlue,
+      fill: COLORS.white,
     });
     setRangeRow(sheet, startRow + 4, 1, total, `A${startRow + 4}:F${startRow + 4}`, {
       fill: softAccent,
@@ -504,19 +518,29 @@
     for (let col = 8; col <= 12; col += 1) {
       sheet.mergeCells(startRow + 2, col, startRow + 4, col);
     }
-    setRangeRow(sheet, startRow + 2, 8, [
+    const mobileValues = [
       prefix === "open" ? "개통완료" : "가설중",
       number(summary[`${prefix}_mobile_usim`]),
       number(summary[`${prefix}_mobile_device`]),
       companionRate,
       mobileTotal,
-    ], `H${startRow + 2}:L${startRow + 4}`, {
+    ];
+    mobileValues.forEach((value, index) => {
+      sheet.getCell(startRow + 2, 8 + index).value = value;
+    });
+    styleRange(sheet, `H${startRow + 2}:H${startRow + 4}`, {
       fill: softAccent,
       font: { bold: true, size: 11, color: { argb: COLORS.navy } },
     });
+    styleRange(sheet, `I${startRow + 2}:K${startRow + 4}`, {
+      fill: COLORS.white,
+      font: { bold: true, size: 11, color: { argb: COLORS.navy } },
+    });
 
-    sheet.getCell(startRow + 2, 12).fill = fill("D9E2F3");
-    sheet.getCell(startRow + 2, 12).font = { bold: true, size: 12, color: { argb: COLORS.navy } };
+    styleRange(sheet, `L${startRow + 2}:L${startRow + 4}`, {
+      fill: "D9E2F3",
+      font: { bold: true, size: 12, color: { argb: COLORS.navy } },
+    });
     sheet.getCell(startRow + 2, 6).numFmt = "0%";
     sheet.getCell(startRow + 3, 6).numFmt = "0%";
     sheet.getCell(startRow + 4, 6).numFmt = "0%";
@@ -688,10 +712,10 @@
     addStatusTable(sheet, 10, "가설중 상세 (월 누적)", monthlySummary, "install", comparison);
     addKpiStrip(sheet, 16, summary, comparison);
     addInternetGoalOverview(sheet, 19, comparison);
-    sheet.pageSetup.printArea = "A1:L28";
+    sheet.pageSetup.printArea = "A1:L29";
     sheet.pageSetup.horizontalCentered = true;
     [3, 9, 15, 18].forEach((row) => {
-      sheet.getRow(row).height = 14;
+      sheet.getRow(row).height = 24;
     });
     sheet.eachRow((reportRow) => {
       reportRow.eachCell({ includeEmpty: true }, (cell) => {
