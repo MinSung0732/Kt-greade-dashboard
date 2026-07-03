@@ -684,14 +684,14 @@
       alignment: { horizontal: "right", vertical: "middle" },
     });
 
-    addKpiStrip(sheet, 4, summary, comparison);
-    addInternetGoalOverview(sheet, 7, comparison);
-    addStatusTable(sheet, 18, "개통 완료 상세 (월 누적)", monthlySummary, "open", comparison);
-    addStatusTable(sheet, 24, "가설중 상세 (월 누적)", monthlySummary, "install", comparison);
+    addStatusTable(sheet, 4, "개통 완료 상세 (월 누적)", monthlySummary, "open", comparison);
+    addStatusTable(sheet, 10, "가설중 상세 (월 누적)", monthlySummary, "install", comparison);
+    addKpiStrip(sheet, 16, summary, comparison);
+    addInternetGoalOverview(sheet, 19, comparison);
     sheet.pageSetup.printArea = "A1:L28";
     sheet.pageSetup.horizontalCentered = true;
-    [3, 6, 17, 23].forEach((row) => {
-      sheet.getRow(row).height = 8;
+    [3, 9, 15, 18].forEach((row) => {
+      sheet.getRow(row).height = 14;
     });
     sheet.eachRow((reportRow) => {
       reportRow.eachCell({ includeEmpty: true }, (cell) => {
